@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}New purchase{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>New purchase (stock in) <small class="hint">{{ current_branch.name }}</small></h1><a href="{{ url_for('purchases') }}" class="btn btn-outline">Cancel</a></div>
+<div class="card">
+  <div class="row" style="display:flex;gap:14px;flex-wrap:wrap">
+    <div class="field" style="flex:1"><label>Supplier</label>
+      <select id="supplier_id"><option value="">-- none --</option>{% for s in suppliers %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select></div>
+    <div class="field" style="flex:1"><label>Supplier bill no</label><input type="text" id="invoice_no"></div>
+    <div class="field" style="flex:1"><label>Date</label><input type="date" id="date" value="{{ today }}"></div>
+    <div class="field" style="flex:2"><label>Note</label><input type="text" id="note"></div>
+  </div>
+  <div class="search-box" style="margin-bottom:12px">
+    <input type="text" id="search" placeholder="Type product name to add..." autocomplete="off">
+    <div class="suggest" id="suggest" style="display:none"></div>
+  </div>
+  <div class="table-wrap"><table id="items">
+    <thead><tr><th>Item</th><th class="num">Current stock</th><th class="num">Qty</th><th class="num">Unit cost &#8377;</th><th class="num">New sell price &#8377;</th><th>Update cost?</th><th class="num">Total</th><th></th></tr></thead>
+    <tbody></tbody>
+    <tfoot><tr><th colspan="6" class="num">Grand total</th><th class="num" id="grand">&#8377;0.00</th><th></th></tr></tfoot>
+  </table></div>
+  <p class="hint">Qty is added to stock of this branch. Tick "Update cost" to make this unit cost the product's new purchase price. Leave "New sell price" blank to keep the old one.</p>
+  <button class="btn btn-lg" id="save" style="width:auto">Save purchase</button>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const rows = [];
+const search = document.getElementById('search'), sug = document.getElementById('suggest');
+let timer, results = [], sel = -1;
+search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(doSearch, 150); });
+search.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown') { sel = Math.min(sel + 1, results.length - 1); paint(); e.preventDefault(); }
+  else if (e.key === 'ArrowUp') { sel = Math.max(sel - 1, 0); paint(); e.preventDefault(); }
+  else if (e.key === 'Enter') { if (results[sel]) add(results[sel]); e.preventDefault(); }
+  else if (e.key === 'Escape') hide();
+});
+async function doSearch() {
+  const qv = search.value.trim();
+  if (!qv) return hide();
+  results = await (await fetch('/api/products/search?q=' + encodeURIComponent(qv))).json();
+  sel = results.length ? 0 : -1; paint();
+}
+function paint() {
+  sug.innerHTML = results.map((p, i) => `<div class="${i===sel?'sel':''}" onclick="add(results[${i}])"><span>${p.name}</span><span class="meta">stock ${p.qty} ${p.unit} · sell ₹${p.selling_price}</span></div>`).join('') || '<div class="meta">No match</div>';
+  sug.style.display = 'block';
+}
+function hide() { sug.style.display = 'none'; sel = -1; }
+function add(p) {
+  const ex = rows.find(r => r.product_id === p.id);
+  if (ex) { ex.quantity += 1; } else rows.push({ product_id: p.id, name: p.name, unit: p.unit, stock: p.qty, quantity: 1, unit_cost: 0, selling_price: '', update_cost: true });
+  search.value = ''; hide(); render();
+  const inputs = document.querySelectorAll('#items tbody input.qty'); inputs[inputs.length - 1].focus();
+}
+function render() {
+  const tb = document.querySelector('#items tbody'); let total = 0;
+  tb.innerHTML = rows.map((r, i) => { const t = r.quantity * r.unit_cost; total += t; return `<tr>
+    <td>${r.name}</td><td class="num">${r.stock} ${r.unit}</td>
+    <td class="num"><input class="qty" type="number" step="0.001" min="0" value="${r.quantity}" style="width:90px;text-align:right" oninput="rows[${i}].quantity=+this.value;upd()"></td>
+    <td class="num"><input type="number" step="0.01" min="0" value="${r.unit_cost}" style="width:100px;text-align:right" oninput="rows[${i}].unit_cost=+this.value;upd()"></td>
+    <td class="num"><input type="number" step="0.01" min="0" value="${r.selling_price}" placeholder="keep" style="width:100px;text-align:right" oninput="rows[${i}].selling_price=this.value"></td>
+    <td><input type="checkbox" ${r.update_cost?'checked':''} onchange="rows[${i}].update_cost=this.checked"></td>
+    <td class="num" id="t${i}">₹${t.toFixed(2)}</td><td><span style="color:#dc2626;cursor:pointer;font-weight:700" onclick="rows.splice(${i},1);render()">✕</span></td></tr>`; }).join('');
+  document.getElementById('grand').textContent = '₹' + total.toFixed(2);
+}
+function upd() { let total = 0; rows.forEach((r, i) => { const t = r.quantity * r.unit_cost; total += t; document.getElementById('t' + i).textContent = '₹' + t.toFixed(2); }); document.getElementById('grand').textContent = '₹' + total.toFixed(2); }
+document.getElementById('save').onclick = async () => {
+  if (!rows.length) return alert('Add at least one item.');
+  const body = { supplier_id: document.getElementById('supplier_id').value, invoice_no: document.getElementById('invoice_no').value,
+    date: document.getElementById('date').value, note: document.getElementById('note').value, items: rows };
+  const r = await (await fetch('/purchases/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
+  if (r.ok) location.href = '/purchases/' + r.id; else alert(r.error || 'Could not save');
+};
+document.addEventListener('click', e => { if (!e.target.closest('.search-box')) hide(); });
+search.focus();
+</script>
+{% endblock %}

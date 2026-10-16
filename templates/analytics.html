@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block container_class %}wide{% endblock %}
+{% block head %}<script src="{{ url_for('static', filename='chart.umd.min.js') }}"></script>{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>Analytics <small class="hint">{{ date_from }} to {{ date_to }} &middot; compared with {{ prev_from }} to {{ prev_to }}</small></h1>
+  <form method="get">
+    {% if current_user.role == 'admin' %}
+    <select name="branch"><option value="all" {{ 'selected' if not bid }}>All branches (overall)</option>{% for b in branches_list %}<option value="{{ b.id }}" {{ 'selected' if bid==b.id }}>{{ b.name }}</option>{% endfor %}</select>
+    {% endif %}
+    <select name="period" onchange="document.getElementById('custom').style.display=this.value=='custom'?'inline':'none'">
+      {% for k, l in [('today','Today'),('7d','Last 7 days'),('30d','Last 30 days'),('month','This month'),('lastmonth','Last month'),('year','This year'),('custom','Custom dates')] %}<option value="{{ k }}" {{ 'selected' if period==k }}>{{ l }}</option>{% endfor %}
+    </select>
+    <span id="custom" style="display:{{ 'inline' if period=='custom' else 'none' }}"><input type="date" name="from" value="{{ date_from }}"> to <input type="date" name="to" value="{{ date_to }}"></span>
+    <button class="btn btn-outline">Show</button>
+  </form>
+</div>
+
+{% macro growth(v) -%}
+  {% if v is none %}<span class="delta flat">no earlier data</span>
+  {% elif v >= 0 %}<span class="delta up">&#9650; {{ v }}%</span>
+  {% else %}<span class="delta down">&#9660; {{ v|abs }}%</span>{% endif %}
+{%- endmacro %}
+<div class="grid grid-4">
+  <div class="stat info"><div class="label">Sales</div><div class="value">{{ d.kpi.sales|inr }}</div><div class="sub">{{ growth(d.growth.sales) }} vs previous</div></div>
+  <div class="stat info"><div class="label">Bills</div><div class="value">{{ d.kpi.bills }}</div><div class="sub">{{ growth(d.growth.bills) }} &middot; avg bill {{ d.kpi.avg_bill|inr }} {{ growth(d.growth.avg_bill) }}</div></div>
+  <div class="stat good"><div class="label">Gross profit (est.)</div><div class="value">{{ d.kpi.profit|inr }}</div><div class="sub">{{ growth(d.growth.profit) }} &middot; margin {{ ((d.kpi.profit / d.kpi.sales * 100) if d.kpi.sales else 0)|round(1) }}%</div></div>
+  <div class="stat warn"><div class="label">Items sold</div><div class="value">{{ d.kpi['items']|qty }}</div><div class="sub">{{ growth(d.growth['items']) }} &middot; discount given {{ d.kpi.discount|inr }}</div></div>
+</div>
+<div class="grid grid-4" style="margin-top:14px">
+  <div class="stat"><div class="label">Credit given in period</div><div class="value" style="font-size:20px">{{ d.kpi.credit|inr }}</div><div class="sub">{{ growth(d.growth.credit) }}</div></div>
+  <div class="stat"><div class="label">Udhaar outstanding (all time)</div><div class="value" style="font-size:20px">{{ d.udhaar.total|inr }}</div><div class="sub">{{ d.udhaar.customers or 0 }} customers owe</div></div>
+  <div class="stat"><div class="label">Stock value at cost</div><div class="value" style="font-size:20px">{{ d.stock_value|inr }}</div><div class="sub">{{ d.low_stock }} items at/below alert level</div></div>
+  <div class="stat"><div class="label">Customers billed by name</div><div class="value" style="font-size:20px">{{ d.kpi.customers }}</div><div class="sub">{{ growth(d.growth.customers) }}</div></div>
+</div>
+
+{% if d.insights %}
+<div class="card notice-card" style="margin-top:18px">
+  <h2>&#128161; What the numbers say</h2>
+  <ul class="insights">{% for i in d.insights %}<li>{{ i }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<div class="grid grid-2" style="margin-top:18px">
+  <div class="card chart-card" style="grid-column: span 2">
+    <h2>Daily sales {% if not bid %}by branch{% endif %}</h2>
+    <div class="chart-wrap"><canvas id="trend"></canvas></div>
+    <details><summary>Table</summary><table><tr><th>Date</th>{% if not bid %}<th>Branch</th>{% endif %}<th class="num">Bills</th><th class="num">Sales</th></tr>
+      {% for r in d.trend %}<tr><td>{{ r.date }}</td>{% if not bid %}<td>{{ r.branch }}</td>{% endif %}<td class="num">{{ r.bills }}</td><td class="num">{{ r.sales|inr }}</td></tr>{% endfor %}</table></details>
+  </div>
+  <div class="card chart-card">
+    <h2>Monthly sales and profit, last 12 months</h2>
+    <div class="chart-wrap"><canvas id="monthly"></canvas></div>
+    <details><summary>Table</summary><table><tr><th>Month</th><th class="num">Bills</th><th class="num">Sales</th><th class="num">Profit</th></tr>
+      {% for r in d.monthly %}<tr><td>{{ r.month }}</td><td class="num">{{ r.bills }}</td><td class="num">{{ r.sales|inr }}</td><td class="num">{{ r.profit|inr }}</td></tr>{% endfor %}</table></details>
+  </div>
+  <div class="card chart-card">
+    <h2>{% if not bid %}Branch comparison{% else %}Branch vs previous period{% endif %}</h2>
+    <div class="chart-wrap"><canvas id="branches"></canvas></div>
+    <details><summary>Table</summary><table><tr><th>Branch</th><th class="num">Bills</th><th class="num">Sales</th><th class="num">Previous</th><th class="num">Change</th></tr>
+      {% for r in d.branches %}<tr><td>{{ r.name }}</td><td class="num">{{ r.bills }}</td><td class="num">{{ r.sales|inr }}</td><td class="num">{{ r.prev_sales|inr }}</td><td class="num">{% if r.prev_sales %}{{ ((r.sales - r.prev_sales) / r.prev_sales * 100)|round(1) }}%{% else %}-{% endif %}</td></tr>{% endfor %}</table></details>
+  </div>
+  <div class="card chart-card">
+    <h2>Top 10 products by sales</h2>
+    <div class="chart-wrap tall"><canvas id="products"></canvas></div>
+    <details><summary>Table</summary><table><tr><th>Product</th><th class="num">Qty</th><th class="num">Sales</th><th class="num">Profit</th></tr>
+      {% for r in d.top_products %}<tr><td>{{ r.name }}</td><td class="num">{{ r.qty|qty }}</td><td class="num">{{ r.sales|inr }}</td><td class="num">{{ r.profit|inr }}</td></tr>{% endfor %}</table></details>
+  </div>
+  <div class="card chart-card">
+    <h2>Sales by category</h2>
+    <div class="chart-wrap tall"><canvas id="categories"></canvas></div>
+    <details><summary>Table</summary><table><tr><th>Category</th><th class="num">Sales</th></tr>
+      {% for r in d.categories %}<tr><td>{{ r.category }}</td><td class="num">{{ r.sales|inr }}</td></tr>{% endfor %}</table></details>
+  </div>
+  <div class="card chart-card">
+    <h2>Payment mix</h2>
+    <div class="chart-wrap"><canvas id="payments"></canvas></div>
+    <details><summary>Table</summary><table><tr><th>Mode</th><th class="num">Bills</th><th class="num">Amount</th></tr>
+      {% for r in d.payments %}<tr><td>{{ r.mode }}</td><td class="num">{{ r.bills }}</td><td class="num">{{ r.amount|inr }}</td></tr>{% endfor %}</table></details>
+  </div>
+  <div class="card chart-card">
+    <h2>Busy hours (bills by hour of day)</h2>
+    <div class="chart-wrap"><canvas id="hourly"></canvas></div>
+  </div>
+  <div class="card chart-card">
+    <h2>Busy days (sales by weekday)</h2>
+    <div class="chart-wrap"><canvas id="weekday"></canvas></div>
+  </div>
+  <div class="card chart-card">
+    <h2>Cashier performance</h2>
+    <div class="chart-wrap"><canvas id="cashiers"></canvas></div>
+  </div>
+  <div class="card">
+    <h2>Slow movers: stock but no sale in this period</h2>
+    <table><tr><th>Product</th><th class="num">Stock</th><th class="num">Value at cost</th></tr>
+      {% for r in d.slow %}<tr><td>{{ r.name }}</td><td class="num">{{ r.qty|qty }} {{ r.unit }}</td><td class="num">{{ r.value|inr }}</td></tr>
+      {% else %}<tr><td colspan="3" class="empty">Every stocked item sold at least once.</td></tr>{% endfor %}</table>
+  </div>
+  <div class="card">
+    <h2>Top customers</h2>
+    <table><tr><th>Customer</th><th class="num">Bills</th><th class="num">Purchases</th><th class="num">Udhaar due</th></tr>
+      {% for r in d.top_customers %}<tr><td>{{ r.name }}</td><td class="num">{{ r.bills }}</td><td class="num">{{ r.sales|inr }}</td><td class="num {{ 'low' if r.credit_balance > 0 }}">{{ r.credit_balance|inr }}</td></tr>
+      {% else %}<tr><td colspan="4" class="empty">No named-customer bills in this period.</td></tr>{% endfor %}</table>
+  </div>
+</div>
+<p class="hint">Gross profit is sale value minus the purchase price at the time of each sale, before expenses. Growth compares with the equal-length period just before the selected one.</p>
+{% endblock %}
+{% block scripts %}
+<script>
+const D = {{ data_json|safe }};
+const C = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
+const inr = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+Chart.defaults.font.family = 'Segoe UI, system-ui, sans-serif';
+Chart.defaults.color = '#52514e';
+const base = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + (c.dataset.money === false ? c.formattedValue : inr(c.parsed.y ?? c.parsed.x)) } } },
+  scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#eef1f4' }, ticks: { callback: v => inr(v) } } } };
+const bar = { borderRadius: 4, borderSkipped: 'start', maxBarThickness: 36 };
+function mk(id, cfg) { const el = document.getElementById(id); if (el) new Chart(el, cfg); }
+
+// daily trend: one line per branch (overall) or one line + previous period (branch)
+{
+  const dates = [...new Set(D.trend.map(r => r.date))].sort();
+  let datasets;
+  if ({{ 'true' if not bid else 'false' }}) {
+    const branches = [...new Set(D.trend.map(r => r.branch))].slice(0, 8);
+    datasets = branches.map((b, i) => ({ label: b, data: dates.map(d => (D.trend.find(r => r.date === d && r.branch === b) || {}).sales || 0),
+      borderColor: C[i], backgroundColor: C[i], tension: .25, borderWidth: 2, pointRadius: 3 }));
+  } else {
+    datasets = [{ label: 'This period', data: dates.map(d => D.trend.filter(r => r.date === d).reduce((a, r) => a + r.sales, 0)), borderColor: C[0], backgroundColor: C[0], tension: .25, borderWidth: 2, pointRadius: 3 },
+                { label: 'Previous period (same day no.)', data: D.prev_trend.map(r => r.sales), borderColor: '#9ca3af', borderDash: [4, 4], borderWidth: 2, pointRadius: 0 }];
+  }
+  mk('trend', { type: 'line', data: { labels: dates, datasets }, options: { ...base, interaction: { mode: 'index', intersect: false } } });
+}
+mk('monthly', { type: 'bar', data: { labels: D.monthly.map(r => r.month), datasets: [
+  { label: 'Sales', data: D.monthly.map(r => r.sales), backgroundColor: C[0], ...bar },
+  { label: 'Profit', data: D.monthly.map(r => r.profit), backgroundColor: C[2], ...bar }] }, options: base });
+mk('branches', { type: 'bar', data: { labels: D.branches.map(r => r.name), datasets: [
+  { label: 'This period', data: D.branches.map(r => r.sales), backgroundColor: C[0], ...bar },
+  { label: 'Previous period', data: D.branches.map(r => r.prev_sales), backgroundColor: '#c3c2b7', ...bar }] }, options: base });
+const horiz = { ...base, indexAxis: 'y', scales: { x: { beginAtZero: true, grid: { color: '#eef1f4' }, ticks: { callback: v => inr(v) } }, y: { grid: { display: false } } }, plugins: { ...base.plugins, legend: { display: false } } };
+mk('products', { type: 'bar', data: { labels: D.top_products.map(r => r.name), datasets: [{ label: 'Sales', data: D.top_products.map(r => r.sales), backgroundColor: C[0], ...bar }] }, options: horiz });
+mk('categories', { type: 'bar', data: { labels: D.categories.map(r => r.category), datasets: [{ label: 'Sales', data: D.categories.map(r => r.sales), backgroundColor: C[1], ...bar }] }, options: horiz });
+mk('payments', { type: 'bar', data: { labels: D.payments.map(r => r.mode), datasets: [{ label: 'Amount', data: D.payments.map(r => r.amount), backgroundColor: D.payments.map((r, i) => C[i]), ...bar }] }, options: horiz });
+{
+  const hours = Array.from({ length: 24 }, (_, h) => h);
+  const count = { ...base, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#eef1f4' }, ticks: { precision: 0 } } }, plugins: { ...base.plugins, legend: { display: false }, tooltip: { callbacks: { label: c => c.formattedValue + ' bills' } } } };
+  mk('hourly', { type: 'bar', data: { labels: hours.map(h => String(h).padStart(2, '0') + ':00'), datasets: [{ label: 'Bills', money: false, data: hours.map(h => (D.hourly.find(r => r.hour === h) || {}).bills || 0), backgroundColor: C[2], ...bar }] }, options: count });
+}
+{
+  const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  mk('weekday', { type: 'bar', data: { labels: names, datasets: [{ label: 'Sales', data: names.map((_, i) => (D.weekday.find(r => r.dow === i) || {}).sales || 0), backgroundColor: C[0], ...bar }] }, options: { ...base, plugins: { ...base.plugins, legend: { display: false } } } });
+}
+mk('cashiers', { type: 'bar', data: { labels: D.cashiers.map(r => r.full_name), datasets: [{ label: 'Sales', data: D.cashiers.map(r => r.sales), backgroundColor: C[6], ...bar }] }, options: horiz });
+</script>
+{% endblock %}

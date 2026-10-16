@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Products{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>Products</h1>
+  <form method="get">
+    <input type="search" name="q" value="{{ search }}" placeholder="Search by name...">
+    <select name="cat"><option value="">All categories</option>
+      {% for c in categories %}<option value="{{ c.id }}" {{ 'selected' if cat|string==c.id|string }}>{{ c.name }}</option>{% endfor %}</select>
+    <button class="btn btn-outline">Filter</button>
+  </form>
+  {% if current_user.role in ['admin','manager'] %}
+  <div><a href="{{ url_for('categories') }}" class="btn btn-outline">Categories</a> <a href="{{ url_for('product_new') }}" class="btn">+ Add Product</a></div>
+  {% endif %}
+</div>
+<div class="card table-wrap">
+<table>
+  <tr><th>Name</th><th>Category</th><th>Unit</th><th>HSN</th><th class="num">GST %</th><th class="num">Cost</th><th class="num">Sell price</th><th class="num">MRP</th><th class="num">Stock ({{ current_branch.code }})</th><th></th></tr>
+  {% for p in products %}
+  <tr>
+    <td><strong>{{ p.name }}</strong></td><td>{{ p.category or '-' }}</td><td>{{ p.unit }}</td><td>{{ p.hsn or '-' }}</td>
+    <td class="num">{{ p.gst_rate|qty }}%</td><td class="num">{{ p.purchase_price|inr }}</td><td class="num">{{ p.selling_price|inr }}</td>
+    <td class="num">{{ p.mrp|inr if p.mrp else '-' }}</td>
+    <td class="num {{ 'low' if p.qty <= p.low_stock_level }}">{{ p.qty|qty }}</td>
+    <td style="white-space:nowrap">
+      {% if current_user.role in ['admin','manager'] %}
+      <a href="{{ url_for('product_edit', pid=p.id) }}" class="btn btn-sm btn-outline">Edit</a>
+      <form method="post" action="{{ url_for('product_delete', pid=p.id) }}" style="display:inline" onsubmit="return confirm('Remove {{ p.name }}?')"><button class="btn btn-sm btn-danger">Remove</button></form>
+      {% endif %}
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="10" class="empty">No products found. {% if current_user.role in ['admin','manager'] %}<a href="{{ url_for('product_new') }}">Add your first product.</a>{% endif %}</td></tr>{% endfor %}
+</table>
+</div>
+<p class="hint">{{ products|length }} products shown.</p>
+{% endblock %}

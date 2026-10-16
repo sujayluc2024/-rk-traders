@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Suppliers{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>Suppliers</h1><button class="btn" onclick="openForm()">+ Add Supplier</button></div>
+<div class="card table-wrap"><table>
+  <tr><th>Name</th><th>Phone</th><th>GSTIN</th><th>Address</th><th></th></tr>
+  {% for s in suppliers %}
+  <tr><td><strong>{{ s.name }}</strong></td><td>{{ s.phone or '-' }}</td><td>{{ s.gstin or '-' }}</td><td>{{ s.address or '-' }}</td>
+      <td><button class="btn btn-sm btn-outline" onclick='openForm({{ dict(s)|tojson }})'>Edit</button></td></tr>
+  {% else %}<tr><td colspan="5" class="empty">No suppliers yet.</td></tr>{% endfor %}
+</table></div>
+
+<div class="modal" id="modal"><div class="box">
+  <h2 id="mtitle">Add supplier</h2>
+  <form method="post">
+    <input type="hidden" name="id" id="f_id">
+    <div class="field"><label>Name *</label><input type="text" name="name" id="f_name" required></div>
+    <div class="field"><label>Phone</label><input type="text" name="phone" id="f_phone"></div>
+    <div class="field"><label>GSTIN</label><input type="text" name="gstin" id="f_gstin"></div>
+    <div class="field"><label>Address</label><textarea name="address" id="f_address" rows="2"></textarea></div>
+    <button class="btn">Save</button> <button type="button" class="btn btn-outline" onclick="document.getElementById('modal').classList.remove('open')">Cancel</button>
+  </form>
+</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+function openForm(s) {
+  s = s || {};
+  document.getElementById('mtitle').textContent = s.id ? 'Edit supplier' : 'Add supplier';
+  for (const k of ['id','name','phone','gstin','address']) document.getElementById('f_'+k).value = s[k] || '';
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('f_name').focus();
+}
+</script>
+{% endblock %}

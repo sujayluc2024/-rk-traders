@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Leave{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>Leave</h1>
+  <div class="tabs">
+    <a href="{{ url_for('leaves', box='mine') }}" class="btn btn-sm {{ 'btn' if box=='mine' else 'btn-outline' }}">My applications</a>
+    {% if current_user.role != 'cashier' %}
+    <a href="{{ url_for('leaves', box='approvals') }}" class="btn btn-sm {{ 'btn' if box=='approvals' else 'btn-outline' }}">Pending approvals{% if pending_leaves %} ({{ pending_leaves }}){% endif %}</a>
+    <a href="{{ url_for('leaves', box='all') }}" class="btn btn-sm {{ 'btn' if box=='all' else 'btn-outline' }}">{{ 'All branches' if current_user.role=='admin' else 'My branch' }}</a>
+    {% endif %}
+  </div>
+  <a href="{{ url_for('leave_new') }}" class="btn">+ Apply for leave</a>
+</div>
+<div class="card table-wrap"><table>
+  <tr>{% if box != 'mine' %}<th>Staff</th><th>Branch</th>{% endif %}<th>Type</th><th>From</th><th>To</th><th class="num">Days</th><th>Reason</th><th>Document</th><th>Status</th><th>Decided by</th></tr>
+  {% for l in rows %}
+  <tr>
+    {% if box != 'mine' %}<td><a href="{{ url_for('leave_detail', lid=l.id) }}"><strong>{{ l.applicant }}</strong></a><br><small class="hint">{{ l.applicant_role }}</small></td><td>{{ l.branch_name or '-' }}</td>{% endif %}
+    <td><a href="{{ url_for('leave_detail', lid=l.id) }}">{{ l.leave_type }}</a></td><td>{{ l.from_date }}</td><td>{{ l.to_date }}</td><td class="num">{{ l.days }}</td>
+    <td>{{ (l.reason or '')[:60] }}</td>
+    <td>{% if l.document %}<a href="{{ url_for('leave_document', lid=l.id) }}" target="_blank">&#128206; View</a>{% else %}-{% endif %}</td>
+    <td><span class="tag lv-{{ l.status }}">{{ l.status|title }}</span>{% if l.overridden_by %}<br><small class="hint">overridden by admin</small>{% endif %}</td>
+    <td>{{ l.overridden_by_name or l.decided_by_name or '-' }}</td>
+  </tr>
+  {% else %}<tr><td colspan="10" class="empty">{{ 'No pending applications.' if box=='approvals' else 'No leave applications.' }}</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Activity log{% endblock %}
+{% from '_export.html' import export_buttons %}
+{% block content %}
+<div class="toolbar">
+  <h1>Activity log</h1>
+  <form method="get">
+    <input type="date" name="from" value="{{ date_from }}"> <span>to</span> <input type="date" name="to" value="{{ date_to }}">
+    <select name="user_id"><option value="">All staff</option>{% for s in staff %}<option value="{{ s.id }}" {{ 'selected' if user_id==s.id }}>{{ s.full_name }}</option>{% endfor %}</select>
+    <select name="branch_id"><option value="">All branches</option>{% for b in branches_list %}<option value="{{ b.id }}" {{ 'selected' if bid==b.id }}>{{ b.name }}</option>{% endfor %}</select>
+    <input type="search" name="q" value="{{ text }}" placeholder="Search action, bill no, details..." style="width:220px">
+    <button class="btn btn-outline">Show</button>
+    <a class="btn btn-sm btn-outline" href="{{ url_for('activity') }}">Today</a>
+  </form>
+  {{ export_buttons('activity_export', {'user_id': user_id or '', 'branch_id': bid or '', 'q': text, 'from': date_from, 'to': date_to}) }}
+</div>
+<div class="card table-wrap"><table class="activity">
+  <tr><th>Date / time</th><th>User</th><th>Branch</th><th>Action</th><th>Reference</th><th>Details</th><th>Result</th><th>IP</th></tr>
+  {% for r in rows %}
+  <tr class="{{ 'failed' if (r.status or 0) >= 400 or 'FAILED' in r.action }}">
+    <td style="white-space:nowrap">{{ r.at }}</td>
+    <td><strong>{{ r.full_name or r.username or '-' }}</strong>{% if r.role %}<br><small class="hint">{{ r.role }}</small>{% endif %}</td>
+    <td>{{ r.branch or '-' }}</td>
+    <td><strong>{{ r.action }}</strong></td>
+    <td>{{ r.entity_id or '' }}</td>
+    <td class="details">{{ r.details if r.details and r.details != '{}' else '' }}</td>
+    <td>{% if (r.status or 0) >= 400 or 'FAILED' in r.action %}<span class="tag credit">Failed</span>{% else %}<span class="tag cash">OK</span>{% endif %}</td>
+    <td><small>{{ r.ip }}</small></td>
+  </tr>
+  {% else %}<tr><td colspan="8" class="empty">No activity in this period.</td></tr>{% endfor %}
+</table></div>
+<p class="hint">{{ rows|length }} entries shown (newest first, up to 2000 on screen; export to Excel for everything). Passwords are never recorded. Searching and viewing pages are not logged; every change, login, print and export is.</p>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Messages{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>Messages <small class="hint">{{ current_branch.name }}</small></h1>
+  <div class="tabs">
+    <a href="{{ url_for('messages', box='inbox') }}" class="btn btn-sm {{ 'btn' if box=='inbox' else 'btn-outline' }}">Inbox{% if unread_messages %} ({{ unread_messages }}){% endif %}</a>
+    <a href="{{ url_for('messages', box='sent') }}" class="btn btn-sm {{ 'btn' if box=='sent' else 'btn-outline' }}">Sent</a>
+    <a href="{{ url_for('messages', box='requests') }}" class="btn btn-sm {{ 'btn' if box=='requests' else 'btn-outline' }}">Stock requests</a>
+  </div>
+  <div><a href="{{ url_for('message_new', kind='stock_request') }}" class="btn btn-outline">Request stock</a> <a href="{{ url_for('message_new') }}" class="btn">+ New message</a></div>
+</div>
+{% if branch_count < 2 %}<div class="flash flash-error">Only one branch exists. Add another branch under Settings before sending messages.</div>{% endif %}
+<div class="card table-wrap"><table>
+  <tr><th></th><th>Subject</th><th>{{ 'To' if box=='sent' else 'From' }}</th><th>Type</th><th>Status</th><th class="num">Replies</th><th>Last activity</th></tr>
+  {% for m in rows %}
+  <tr class="{{ 'unread' if m.unread }}">
+    <td>{% if m.unread %}<span class="dot"></span>{% endif %}</td>
+    <td><a href="{{ url_for('message_thread', mid=m.id) }}"><strong>{{ m.subject or '(no subject)' }}</strong></a>
+        {% if m.kind=='stock_request' %}<br><small class="hint">{{ m.quantity|qty }} {{ m.unit }} {{ m.product }}</small>{% elif m.body %}<br><small class="hint">{{ m.body[:80] }}{{ '...' if m.body|length > 80 }}</small>{% endif %}</td>
+    <td>{{ m.to_branch if box=='sent' else m.from_branch }}<br><small class="hint">{{ m.sender }}</small></td>
+    <td><span class="tag {{ 'credit' if m.kind=='stock_request' else '' }}">{{ 'Stock request' if m.kind=='stock_request' else 'Message' }}</span></td>
+    <td>{% if m.kind=='stock_request' %}<span class="tag st-{{ m.status }}">{{ m.status|title }}</span>{% elif m.status=='closed' %}<span class="tag">Closed</span>{% endif %}</td>
+    <td class="num">{{ m.replies }}</td><td>{{ m.last_at }}</td>
+  </tr>
+  {% else %}<tr><td colspan="7" class="empty">Nothing here yet.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

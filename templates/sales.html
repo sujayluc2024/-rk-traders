@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Bills{% endblock %}
+{% from '_export.html' import export_buttons %}
+{% block content %}
+<div class="toolbar">
+  <h1>Bills <small class="hint">{{ current_branch.name }}</small></h1>
+  <form method="get">
+    <input type="date" name="from" value="{{ date_from }}"> <span>to</span> <input type="date" name="to" value="{{ date_to }}">
+    <button class="btn btn-outline">Show</button>
+  </form>
+  <div>{{ export_buttons('sales_export', {'from': date_from, 'to': date_to}) }} <a href="{{ url_for('billing') }}" class="btn btn-accent">+ New Bill</a></div>
+</div>
+<div class="card table-wrap"><table>
+  <tr><th>Invoice</th><th>Date / time</th><th>Counter</th><th>Customer</th><th>Cashier</th><th>Mode</th><th class="num">Total</th><th class="num">Credit</th><th></th></tr>
+  {% for s in sales %}
+  <tr>
+    <td><a href="{{ url_for('sale_detail', sid=s.id) }}"><strong>{{ s.invoice_no }}</strong></a></td><td>{{ s.created_at }}</td><td>{{ s.counter }}</td>
+    <td>{{ s.customer or 'Walk-in' }}</td><td>{{ s.user or '-' }}</td><td><span class="tag {{ s.payment_mode|lower }}">{{ s.payment_mode }}</span></td>
+    <td class="num">{{ s.grand_total|inr }}</td><td class="num">{{ s.credit_amount|inr if s.credit_amount else '-' }}</td>
+    <td style="white-space:nowrap"><a href="{{ url_for('sale_detail', sid=s.id, print=1) }}" target="_blank" class="btn btn-sm btn-outline">Print</a>
+      {% if current_user.role == 'admin' %}<form method="post" action="{{ url_for('sale_delete', sid=s.id) }}" style="display:inline" onsubmit="return confirm('Cancel bill {{ s.invoice_no }}? Stock will be restored.')"><button class="btn btn-sm btn-danger">Cancel</button></form>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="9" class="empty">No bills in this period.</td></tr>{% endfor %}
+  {% if sales %}<tr><th colspan="6" class="num">Total ({{ sales|length }} bills)</th><th class="num">{{ total|inr }}</th><th colspan="2"></th></tr>{% endif %}
+</table></div>
+{% endblock %}

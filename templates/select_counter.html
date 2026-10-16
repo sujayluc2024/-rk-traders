@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Select counter{% endblock %}
+{% block content %}
+<div class="card" style="max-width:520px;margin:40px auto">
+  <h1>Choose billing counter</h1>
+  <p class="hint">Every bill you make will be numbered under this counter. You can change it later from the top bar.</p>
+  <form method="post">
+    <div class="field">
+      <label>Counter</label>
+      <select name="counter_id" required>
+        {% for c in counters %}
+        <option value="{{ c.id }}" {{ 'selected' if current_counter and c.id==current_counter.id }}>{{ c.branch_name }} &mdash; {{ c.code }} {{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-lg">Continue</button>
+  </form>
+</div>
+{% endblock %}

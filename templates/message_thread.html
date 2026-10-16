@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}{{ root.subject }}{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>{{ root.subject or '(no subject)' }}</h1>
+  <a href="{{ url_for('messages', box='requests' if root.kind=='stock_request' else 'inbox') }}" class="btn btn-outline">Back</a>
+</div>
+<div class="grid grid-3">
+  <div style="grid-column: span 2">
+    <div class="card thread">
+      <div class="msg {{ 'mine' if root.from_branch_id==current_branch.id else 'theirs' }}">
+        <div class="who"><strong>{{ root.from_branch }}</strong> &middot; {{ root.sender }} &middot; {{ root.created_at }} &rarr; {{ root.to_branch }}</div>
+        {% if root.kind=='stock_request' %}
+        <div class="reqbox">Requesting <strong>{{ root.quantity|qty }} {{ root.unit }}</strong> of <strong>{{ root.product }}</strong>
+          {% if root.status=='sent' %}&mdash; <span class="tag st-sent">Sent {{ root.sent_quantity|qty }} {{ root.unit }}</span>
+          {% else %}&mdash; <span class="tag st-{{ root.status }}">{{ root.status|title }}</span>{% endif %}</div>
+        {% endif %}
+        {% if root.body %}<div class="body">{{ root.body }}</div>{% endif %}
+      </div>
+      {% for r in replies %}
+      <div class="msg {{ 'mine' if r.from_branch_id==current_branch.id else 'theirs' }}">
+        <div class="who"><strong>{{ r.from_branch }}</strong> &middot; {{ r.sender }} &middot; {{ r.created_at }}</div>
+        <div class="body">{{ r.body }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% if root.status != 'closed' %}
+    <div class="card">
+      <form method="post">
+        <div class="field"><label>Reply</label><textarea name="body" rows="3" required placeholder="Write a reply..."></textarea></div>
+        <button class="btn">Send reply</button>
+      </form>
+    </div>
+    {% else %}<p class="hint">This thread is closed.</p>{% endif %}
+  </div>
+
+  <div>
+    {% if root.kind=='stock_request' %}
+    <div class="card">
+      <h2>Stock request</h2>
+      <table>
+        <tr><td>Product</td><td><strong>{{ root.product }}</strong></td></tr>
+        <tr><td>Requested</td><td>{{ root.quantity|qty }} {{ root.unit }}</td></tr>
+        <tr><td>{{ root.from_branch }} has</td><td>{{ (my_stock if i_am_sender else their_stock)|qty }} {{ root.unit }}</td></tr>
+        <tr><td>{{ root.to_branch }} has</td><td>{{ (my_stock if i_am_receiver else their_stock)|qty }} {{ root.unit }}</td></tr>
+        <tr><td>Status</td><td><span class="tag st-{{ root.status }}">{{ root.status|title }}</span></td></tr>
+      </table>
+      {% if i_am_receiver and root.status=='open' %}
+      <hr>
+      <form method="post" action="{{ url_for('message_send_stock', mid=root.id) }}">
+        <div class="field"><label>Send quantity ({{ root.unit }})</label>
+          <input type="number" step="0.001" min="0.001" max="{{ my_stock }}" name="quantity" value="{{ [root.quantity, my_stock]|min|qty }}" required></div>
+        <div class="field"><label>Note (optional)</label><input type="text" name="body" placeholder="e.g. sending with the evening van"></div>
+        <button class="btn" onclick="return confirm('Transfer stock to {{ root.from_branch }} now?')">Send stock</button>
+      </form>
+      <p class="hint">Stock is moved from {{ root.to_branch }} to {{ root.from_branch }} immediately and recorded in stock history on both sides.</p>
+      <form method="post" action="{{ url_for('message_status', mid=root.id) }}" style="margin-top:10px">
+        <input type="hidden" name="status" value="declined">
+        <div class="field"><input type="text" name="body" placeholder="Reason (optional)"></div>
+        <button class="btn btn-outline btn-danger" style="color:#fff">Decline</button>
+      </form>
+      {% endif %}
+      {% if i_am_sender and root.status=='declined' %}
+      <form method="post" action="{{ url_for('message_status', mid=root.id) }}"><input type="hidden" name="status" value="open"><button class="btn btn-outline">Reopen request</button></form>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% if root.status != 'closed' and (i_am_sender or current_user.role=='admin') %}
+    <div class="card">
+      <form method="post" action="{{ url_for('message_status', mid=root.id) }}"><input type="hidden" name="status" value="closed">
+        <button class="btn btn-outline">Close thread</button></form>
+      <p class="hint">Close when the matter is finished. Closed threads stay in the list for record.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

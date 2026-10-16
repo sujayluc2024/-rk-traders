@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Leave policy{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>Leave policy</h1><a href="{{ url_for('settings_page') }}" class="btn btn-outline">Back to settings</a></div>
+<div class="grid grid-3">
+  <div class="card table-wrap" style="grid-column: span 2">
+    <form method="post">
+      <table>
+        <tr><th>Leave type</th><th class="num">Days per year</th><th class="num">Available after (months of joining)</th><th>Active</th></tr>
+        {% for p in policies %}
+        <tr>
+          <td><strong>{{ p.leave_type }}</strong><input type="hidden" name="type" value="{{ p.leave_type }}"></td>
+          <td class="num"><input type="number" min="0" name="days_{{ p.leave_type }}" value="{{ p.days_per_year }}" style="width:90px;text-align:right"></td>
+          <td class="num"><input type="number" min="0" name="months_{{ p.leave_type }}" value="{{ p.eligible_after_months }}" style="width:90px;text-align:right"></td>
+          <td><input type="checkbox" name="active_{{ p.leave_type }}" {{ 'checked' if p.active }}></td>
+        </tr>
+        {% endfor %}
+      </table>
+      <p class="hint">Days per year <strong>0</strong> means no limit (for example Unpaid). "Available after" <strong>0</strong> means available immediately from the joining date. Entitlement is counted per calendar year (January to December) from approved leave. The joining date of each staff member is set under Users.</p>
+      <button class="btn">Save policy</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Add leave type</h2>
+    <form method="post">
+      <div class="field"><label>Name</label><input type="text" name="new_type" required placeholder="e.g. Maternity"></div>
+      <div class="row">
+        <div class="field"><label>Days per year</label><input type="number" min="0" name="new_days" value="0"></div>
+        <div class="field"><label>After months</label><input type="number" min="0" name="new_months" value="0"></div>
+      </div>
+      <button class="btn">Add</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

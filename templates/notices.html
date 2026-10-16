@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Notices{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>Notices</h1>
+  {% if current_user.role in ['admin','manager'] %}
+  <div class="tabs">
+    <a href="{{ url_for('notices', box='inbox') }}" class="btn btn-sm {{ 'btn' if box=='inbox' else 'btn-outline' }}">Received{% if unread_notices %} ({{ unread_notices }}){% endif %}</a>
+    <a href="{{ url_for('notices', box='sent') }}" class="btn btn-sm {{ 'btn' if box=='sent' else 'btn-outline' }}">{{ 'All sent' if current_user.role=='admin' else 'Sent by me' }}</a>
+  </div>
+  <a href="{{ url_for('notice_new') }}" class="btn">+ New notice</a>
+  {% endif %}
+</div>
+<div class="card table-wrap"><table>
+  {% if box == 'sent' %}
+  <tr><th>Title</th><th>Sent to</th><th>From</th><th>Date</th><th class="num">Read by</th></tr>
+  {% for n in rows %}
+  <tr><td><a href="{{ url_for('notice_detail', nid=n.id) }}"><strong>{{ n.title }}</strong></a></td><td>{{ n.audience }}</td><td>{{ n.sender }}</td><td>{{ n.created_at }}</td>
+      <td class="num">{{ n.read_count }} / {{ n.total }}</td></tr>
+  {% else %}<tr><td colspan="5" class="empty">No notices sent yet.</td></tr>{% endfor %}
+  {% else %}
+  <tr><th></th><th>Title</th><th>From</th><th>Date</th><th>Read</th></tr>
+  {% for n in rows %}
+  <tr class="{{ 'unread' if not n.read_at }}">
+    <td>{% if not n.read_at %}<span class="dot"></span>{% endif %}</td>
+    <td><a href="{{ url_for('notice_detail', nid=n.id) }}"><strong>{{ n.title }}</strong></a>{% if n.body %}<br><small class="hint">{{ n.body[:90] }}{{ '...' if n.body|length > 90 }}</small>{% endif %}</td>
+    <td>{{ n.sender }}</td><td>{{ n.created_at }}</td><td>{{ n.read_at or 'New' }}</td></tr>
+  {% else %}<tr><td colspan="5" class="empty">No notices for you.</td></tr>{% endfor %}
+  {% endif %}
+</table></div>
+{% endblock %}

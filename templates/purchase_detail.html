@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Purchase P-{{ p.id }}{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>Purchase P-{{ p.id }}</h1><a href="{{ url_for('purchases') }}" class="btn btn-outline">Back</a></div>
+<div class="card">
+  <p><strong>Date:</strong> {{ p.date }} &nbsp; <strong>Supplier:</strong> {{ p.supplier or '-' }} {{ p.supplier_phone }} &nbsp; <strong>Supplier bill no:</strong> {{ p.invoice_no or '-' }}</p>
+  {% if p.note %}<p><strong>Note:</strong> {{ p.note }}</p>{% endif %}
+  <table>
+    <tr><th>Item</th><th class="num">Qty</th><th class="num">Unit cost</th><th class="num">Total</th></tr>
+    {% for i in items %}<tr><td>{{ i.name }}</td><td class="num">{{ i.quantity|qty }} {{ i.unit }}</td><td class="num">{{ i.unit_cost|inr }}</td><td class="num">{{ i.total|inr }}</td></tr>{% endfor %}
+    <tr><th colspan="3" class="num">Grand total</th><th class="num">{{ p.total|inr }}</th></tr>
+  </table>
+</div>
+{% endblock %}

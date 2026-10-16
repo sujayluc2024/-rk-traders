@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>{{ 'Users' if is_admin else 'Cashiers of ' ~ current_branch.name }}</h1>{% if is_admin %}<a href="{{ url_for('settings_page') }}" class="btn btn-outline">Back to settings</a>{% endif %}</div>
+<div class="grid grid-2">
+  <div class="card table-wrap">
+    <table><tr><th>Username</th><th>Name</th><th>Role</th><th>Branch</th><th>Joined</th><th>Device</th><th></th></tr>
+    {% for u in users %}
+    <tr><td><strong>{{ u.username }}</strong>{% if not u.active %} <span class="tag">inactive</span>{% endif %}</td><td>{{ u.full_name }}</td>
+        <td><span class="tag">{{ u.role }}</span>{% if u.can_manage_users %}<br><small class="hint">can add cashiers</small>{% endif %}{% if u.can_view_analytics %}<br><small class="hint">analytics access</small>{% endif %}{% if u.can_reset_device %}<br><small class="hint">can reset devices</small>{% endif %}</td>
+        <td>{{ u.branch_name or 'All branches' }}</td><td>{{ u.joining_date or '-' }}</td>
+        <td>{% if not u.device_lock %}<span class="hint">not locked</span>{% elif u.bound_ip %}<span class="tag cash" title="since {{ u.bound_at }}">{{ u.bound_ip }}</span>
+            {% if can_reset_device %}<form method="post" action="{{ url_for('user_reset_device', uid=u.id) }}" style="display:inline" onsubmit="return confirm('Reset device for {{ u.full_name }}? Their next login will register a new device.')"><button class="btn-link" style="font-size:12px">reset</button></form>{% endif %}
+            {% else %}<span class="tag upi">locks on next login</span>{% endif %}</td>
+        <td><button class="btn btn-sm btn-outline" onclick='editUser({{ dict(u)|tojson }})'>Edit</button></td></tr>
+    {% endfor %}</table>
+  </div>
+  <div class="card">
+    <h2 id="utitle">{{ 'Add user' if is_admin else 'Add cashier' }}</h2>
+    <form method="post">
+      <input type="hidden" name="id" id="u_id">
+      <div class="row">
+        <div class="field"><label>Username *</label><input type="text" name="username" id="u_username" required></div>
+        <div class="field"><label>Full name *</label><input type="text" name="full_name" id="u_full_name" required></div>
+      </div>
+      {% if is_admin %}
+      <div class="row">
+        <div class="field"><label>Role</label>
+          <select name="role" id="u_role" onchange="roleChanged()"><option value="cashier">Cashier (billing only)</option><option value="manager">Manager (stock, purchases, reports)</option><option value="admin">Admin (everything, all branches)</option></select></div>
+        <div class="field"><label>Branch</label>
+          <select name="branch_id" id="u_branch">{% for b in branches %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}</select></div>
+      </div>
+      <div class="field" id="u_manage_wrap" style="display:none"><label class="checkbox"><input type="checkbox" name="can_manage_users" id="u_can_manage"> Allow this manager to create and edit cashier users of their branch</label>
+        <label class="checkbox"><input type="checkbox" name="can_reset_device" id="u_can_reset"> Allow this manager to reset device locks of their branch cashiers</label></div>
+      <div class="field" id="u_analytics_wrap"><label class="checkbox"><input type="checkbox" name="can_view_analytics" id="u_can_analytics"> Allow access to the Analytics dashboard (own branch for managers and cashiers)</label></div>
+      {% endif %}
+      <div class="row">
+        <div class="field"><label>Joining date <span class="hint">(for leave entitlement)</span></label><input type="date" name="joining_date" id="u_joining" value="{{ today }}"></div>
+        <div class="field"><label>Password <span id="pwhint"></span></label><input type="password" name="password" id="u_password" required minlength="4"></div>
+      </div>
+      <div class="field"><label class="checkbox"><input type="checkbox" name="device_lock" id="u_device_lock" value="1" checked> Lock this account to the first device it logs in from (by network address)</label></div>
+      <div class="field" id="u_active_wrap" style="display:none"><label class="checkbox"><input type="checkbox" name="active" id="u_active" checked> Active</label></div>
+      <button class="btn">Save</button> <button type="button" class="btn btn-outline" onclick="editUser()">Clear</button>
+    </form>
+    <p class="hint">{% if is_admin %}Cashiers and managers belong to one branch and can only see that branch. Admins see all branches.{% else %}New users are created as cashiers of your branch. Untick Active to stop someone logging in.{% endif %}</p>
+    <p class="hint"><strong>Device lock:</strong> the first login saves the computer's network address. A login from another address is refused with a message. If a computer is replaced or its address changes, click <em>reset</em> next to the user. Give each counter PC a fixed address in your router so the lock stays reliable.</p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const isAdmin = {{ 'true' if is_admin else 'false' }};
+function roleChanged() {
+  if (!isAdmin) return;
+  document.getElementById('u_manage_wrap').style.display = document.getElementById('u_role').value === 'manager' ? 'block' : 'none';
+  document.getElementById('u_analytics_wrap').style.display = document.getElementById('u_role').value === 'admin' ? 'none' : 'block';
+}
+function editUser(u) {
+  u = u || {};
+  document.getElementById('utitle').textContent = u.id ? 'Edit ' + u.username : (isAdmin ? 'Add user' : 'Add cashier');
+  document.getElementById('u_id').value = u.id || '';
+  document.getElementById('u_username').value = u.username || '';
+  document.getElementById('u_username').readOnly = !!u.id;
+  document.getElementById('u_full_name').value = u.full_name || '';
+  if (isAdmin) {
+    document.getElementById('u_role').value = u.role || 'cashier';
+    if (u.branch_id) document.getElementById('u_branch').value = u.branch_id;
+    document.getElementById('u_can_manage').checked = !!u.can_manage_users;
+    document.getElementById('u_can_reset').checked = !!u.can_reset_device;
+    document.getElementById('u_can_analytics').checked = !!u.can_view_analytics;
+    roleChanged();
+  }
+  document.getElementById('u_joining').value = u.joining_date || (u.id ? '' : '{{ today }}');
+  document.getElementById('u_password').value = '';
+  document.getElementById('u_password').required = !u.id;
+  document.getElementById('pwhint').textContent = u.id ? '(leave blank to keep current)' : '';
+  document.getElementById('u_active').checked = u.id ? !!u.active : true;
+  document.getElementById('u_device_lock').checked = u.id ? !!u.device_lock : (isAdmin ? document.getElementById('u_role').value !== 'admin' : true);
+  document.getElementById('u_active_wrap').style.display = u.id ? 'block' : 'none';
+}
+roleChanged();
+</script>
+{% endblock %}

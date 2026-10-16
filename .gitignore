@@ -1,0 +1,19 @@
+# live data - never commit
+rktraders.db
+rktraders.db-journal
+uploads/*
+!uploads/leave/
+uploads/leave/*
+!uploads/leave/.gitkeep
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# editor / os
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

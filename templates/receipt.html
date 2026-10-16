@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Receipt {{ p.receipt_no }}</title>
+<style>
+  @page { size: A4; margin: 12mm; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #000; font-size: 13px; margin: 0; background: #e9ecef; }
+  .sheet { width: 210mm; margin: 16px auto; background: #fff; padding: 14mm; box-sizing: border-box; }
+  .actions { width: 210mm; margin: 12px auto 0; display: flex; gap: 10px; }
+  .actions a, .actions button { padding: 9px 16px; border-radius: 6px; border: 1px solid #0f766e; background: #0f766e; color: #fff; font-size: 14px; cursor: pointer; text-decoration: none; }
+  .actions a.alt { background: #fff; color: #0f766e; }
+  .head { display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 10px; }
+  .shop h1 { margin: 0; font-size: 26px; }
+  .shop p, .meta p { margin: 2px 0; }
+  .meta { text-align: right; }
+  .meta h2 { margin: 0 0 6px; font-size: 18px; }
+  .box { border: 1px solid #000; padding: 12px 14px; margin-top: 14px; }
+  .box p { margin: 4px 0; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { border: 1px solid #000; padding: 5px 7px; }
+  th { background: #f1f3f5; font-size: 12px; text-transform: uppercase; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .bal { display: flex; justify-content: flex-end; margin-top: 12px; }
+  .bal table { width: 55%; margin: 0; }
+  .bal td { border: none; border-bottom: 1px solid #ddd; }
+  .bal tr.big td { font-size: 17px; font-weight: 700; border-top: 2px solid #000; border-bottom: 2px solid #000; }
+  .footer { margin-top: 36px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .sign { text-align: center; width: 220px; border-top: 1px solid #000; padding-top: 4px; }
+  .words { margin-top: 8px; font-style: italic; }
+  @media print { body { background: #fff; } .sheet { margin: 0; padding: 0; width: auto; } .actions { display: none; } }
+</style>
+</head>
+<body>
+<div class="actions">
+  <button onclick="window.print()">Print</button>
+  <a class="alt" href="{{ url_for('customer_detail', cid=p.customer_id) }}">Back to {{ p.customer }}</a>
+  <a class="alt" href="{{ url_for('receipts') }}">All receipts</a>
+</div>
+<div class="sheet">
+  <div class="head">
+    <div class="shop">
+      <h1>{{ settings.shop_name }}</h1>
+      <p>{{ settings.shop_tagline }}</p>
+      <p>{{ p.branch_address or settings.shop_address }}</p>
+      {% if p.branch_phone or settings.shop_phone %}<p>Phone: {{ p.branch_phone or settings.shop_phone }}</p>{% endif %}
+      {% if p.branch_gstin or settings.shop_gstin %}<p><strong>GSTIN: {{ p.branch_gstin or settings.shop_gstin }}</strong></p>{% endif %}
+    </div>
+    <div class="meta">
+      <h2>PAYMENT RECEIPT</h2>
+      <p><strong>Receipt No:</strong> {{ p.receipt_no }}</p>
+      <p><strong>Date:</strong> {{ p.date }}</p>
+      <p><strong>Branch:</strong> {{ p.branch_name or '-' }}</p>
+      <p><strong>Received by:</strong> {{ p.received_by or '-' }}</p>
+    </div>
+  </div>
+
+  <div class="box">
+    <p>Received with thanks from <strong>{{ p.customer }}</strong>{% if p.customer_phone %} ({{ p.customer_phone }}){% endif %}</p>
+    <p>the sum of <strong>{{ p.amount|inr }}</strong> &mdash; Rupees {{ p.amount|words }} Only</p>
+    <p>by <strong>{{ p.mode }}</strong>{% if p.note %} &mdash; {{ p.note }}{% endif %}, towards settlement of credit (udhaar) as per invoices below.</p>
+  </div>
+
+  <table>
+    <thead><tr><th>Invoice No</th><th>Invoice date</th><th class="num">Bill amount</th><th class="num">Credit on invoice</th><th class="num">Paid by this receipt</th><th class="num">Still due on invoice</th></tr></thead>
+    <tbody>
+      {% for a in allocs %}
+      <tr><td>{{ a.invoice_no }}</td><td>{{ a.date }}</td><td class="num">{{ a.grand_total|inr(false) }}</td><td class="num">{{ a.credit_amount|inr(false) }}</td>
+          <td class="num">{{ a.amount|inr(false) }}</td><td class="num">{{ a.still_due|inr(false) }}</td></tr>
+      {% else %}
+      <tr><td colspan="6" style="text-align:center">Applied to opening balance (no specific invoice).</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="bal">
+    <table>
+      <tr><td>Balance before this receipt</td><td class="num">{{ p.prev_balance|inr }}</td></tr>
+      <tr><td>Amount received</td><td class="num">- {{ p.amount|inr }}</td></tr>
+      <tr class="big"><td>Balance still due</td><td class="num">{{ p.new_balance|inr }}</td></tr>
+    </table>
+  </div>
+
+  <div class="footer">
+    <div style="font-size:12px;color:#444">{{ settings.invoice_footer }}</div>
+    <div class="sign">For {{ settings.shop_name }}<br><br>Authorised Signatory</div>
+  </div>
+</div>
+{% if autoprint %}<script>window.addEventListener('load', () => setTimeout(() => window.print(), 300));</script>{% endif %}
+</body>
+</html>

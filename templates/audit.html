@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Login history{% endblock %}
+{% from '_export.html' import export_buttons %}
+{% block content %}
+<div class="toolbar">
+  <h1>{{ 'My login history' if current_user.role=='cashier' else 'Login audit' }}</h1>
+  <form method="get">
+    <select name="mode"><option value="sessions" {{ 'selected' if mode=='sessions' }}>Each login</option><option value="daily" {{ 'selected' if mode=='daily' }}>Daily summary</option></select>
+    {% if staff %}<select name="user_id"><option value="">All staff</option>{% for s in staff %}<option value="{{ s.id }}" {{ 'selected' if user_id==s.id }}>{{ s.full_name }}</option>{% endfor %}</select>{% endif %}
+    <input type="date" name="from" value="{{ date_from }}"> <span>to</span> <input type="date" name="to" value="{{ date_to }}">
+    <button class="btn btn-outline">Show</button>
+  </form>
+  {{ export_buttons('audit_export', {'mode': mode, 'user_id': user_id or '', 'from': date_from, 'to': date_to}) }}
+</div>
+<div class="card table-wrap"><table>
+  {% if mode == 'daily' %}
+  <tr><th>Date</th><th>Staff</th><th>Branch</th><th class="num">Logins</th><th>First login</th><th>Last logout</th><th class="num">Hours</th><th class="num">Bills</th><th class="num">Sales</th></tr>
+  {% for r in rows %}
+  <tr><td>{{ r.date }}</td><td><strong>{{ r.staff }}</strong> <small class="hint">{{ r.role }}</small></td><td>{{ r.branch or '-' }}</td><td class="num">{{ r.logins }}</td>
+      <td>{{ r.first_login }}</td><td>{{ r.last_logout }}</td><td class="num">{{ r.hours }}</td><td class="num">{{ r.bills }}</td><td class="num">{{ r.sales|inr }}</td></tr>
+  {% else %}<tr><td colspan="9" class="empty">No logins in this period.</td></tr>{% endfor %}
+  {% else %}
+  <tr><th>Staff</th><th>Branch / counter</th><th>Login</th><th>Logout</th><th>How ended</th><th class="num">Hours</th><th class="num">Bills</th><th class="num">Sales</th><th>From (IP)</th></tr>
+  {% for r in rows %}
+  <tr><td><strong>{{ r.staff }}</strong> <small class="hint">{{ r.role }}</small></td><td>{{ r.branch or '-' }} {{ '/ ' ~ r.counter if r.counter }}</td>
+      <td>{{ r.login_at }}</td>
+      <td>{% if r.logout_at %}{{ r.logout_at }}{% elif r.last_seen_at %}<span class="hint">active till {{ r.last_seen_at }}</span>{% else %}<span class="hint">-</span>{% endif %}</td>
+      <td>{% if r.end_reason=='logout' %}<span class="tag cash">Logged out</span>{% elif r.end_reason=='relogin' %}<span class="tag credit">Not logged out</span>{% else %}<span class="tag upi">Still logged in</span>{% endif %}</td>
+      <td class="num">{{ r.hours }}</td><td class="num">{{ r.bills }}</td><td class="num">{{ r.sales|inr }}</td><td><small>{{ r.ip }}</small></td></tr>
+  {% else %}<tr><td colspan="9" class="empty">No logins in this period.</td></tr>{% endfor %}
+  {% endif %}
+</table></div>
+<p class="hint">"Not logged out" means the person closed the browser or logged in again without logging out, so the end time is the last moment they were active.</p>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Apply for leave{% endblock %}
+{% block content %}
+<div class="grid grid-3">
+<div class="card" style="grid-column: span 2">
+  <h1>Apply for leave</h1>
+  <p class="hint">{% if current_user.role == 'cashier' %}Your branch manager will approve or reject this.{% else %}The admin will approve or reject this.{% endif %}</p>
+  <form method="post" enctype="multipart/form-data">
+    <div class="row">
+      <div class="field"><label>Leave type</label><select name="leave_type" id="ltype">{% for b in balances %}<option value="{{ b.type }}">{{ b.type }}{% if b.limited %} ({{ b.balance }} left){% endif %}</option>{% endfor %}</select></div>
+      <div class="field"><label>From</label><input type="date" name="from_date" id="from" value="{{ today }}" required></div>
+      <div class="field"><label>To</label><input type="date" name="to_date" id="to" value="{{ today }}" required></div>
+    </div>
+    <p class="hint" id="days"></p>
+    <div class="field"><label>Reason</label><textarea name="reason" rows="3" required placeholder="e.g. Fever, doctor advised rest"></textarea></div>
+    <div class="field"><label>Document (optional) <span class="hint">PDF, JPG or PNG, up to 5 MB, e.g. medical certificate</span></label><input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png"></div>
+    <button class="btn">Submit application</button> <a href="{{ url_for('leaves') }}" class="btn btn-outline">Cancel</a>
+  </form>
+</div>
+<div class="card">
+  <h2>Your leave balance {{ today[:4] }}</h2>
+  <table>
+    <tr><th>Type</th><th class="num">Entitled</th><th class="num">Used</th><th class="num">Pending</th><th class="num">Left</th></tr>
+    {% for b in balances %}
+    <tr><td>{{ b.type }}{% if b.eligible_from and b.eligible_from.isoformat() > today %}<br><small class="low">from {{ b.eligible_from }}</small>{% endif %}</td>
+        <td class="num">{{ b.entitled if b.limited else 'No limit' }}</td><td class="num">{{ b.used }}</td><td class="num">{{ b.pending }}</td>
+        <td class="num"><strong class="{{ 'low' if b.limited and b.balance <= 0 }}">{{ b.balance if b.limited else '-' }}</strong></td></tr>
+    {% endfor %}
+  </table>
+  {% if not current_user.joining_date %}<p class="hint">Your joining date is not set, so all types are treated as available now.</p>{% else %}<p class="hint">Joined {{ current_user.joining_date }}.</p>{% endif %}
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function calc() {
+  const a = new Date(document.getElementById('from').value), b = new Date(document.getElementById('to').value);
+  const d = Math.round((b - a) / 86400000) + 1;
+  document.getElementById('days').textContent = (isNaN(d) || d < 1) ? '' : d + ' day(s)';
+}
+document.getElementById('from').addEventListener('change', () => { if (document.getElementById('to').value < document.getElementById('from').value) document.getElementById('to').value = document.getElementById('from').value; calc(); });
+document.getElementById('to').addEventListener('change', calc); calc();
+</script>
+{% endblock %}

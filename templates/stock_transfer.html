@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Transfer stock{% endblock %}
+{% block content %}
+<div class="card" style="max-width:560px">
+  <h1>Transfer stock from {{ current_branch.name }}</h1>
+  <form method="post">
+    <div class="field"><label>Product</label>
+      <select name="product_id" required>{% for p in products %}<option value="{{ p.id }}">{{ p.name }} (have {{ p.qty|qty }} {{ p.unit }})</option>{% endfor %}</select></div>
+    <div class="field"><label>Quantity</label><input type="number" step="0.001" min="0.001" name="quantity" required></div>
+    <div class="field"><label>To branch</label>
+      <select name="to_branch" required>{% for b in branches %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}</select></div>
+    <button class="btn">Transfer</button> <a href="{{ url_for('stock') }}" class="btn btn-outline">Cancel</a>
+  </form>
+</div>
+{% endblock %}

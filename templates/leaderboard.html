@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>Leaderboard <small class="hint">{{ date_from }} to {{ date_to }}</small></h1>
+  <form method="get" id="lbform">
+    {% if branches_list %}<select name="branch"><option value="all" {{ 'selected' if not bid }}>All branches</option>{% for b in branches_list %}<option value="{{ b.id }}" {{ 'selected' if bid==b.id }}>{{ b.name }}</option>{% endfor %}</select>{% endif %}
+    <select name="period" onchange="document.getElementById('custom').style.display=this.value=='custom'?'inline':'none'">
+      {% for k, l in [('today','Today'),('week','This week'),('month','This month'),('year','This year'),('custom','Custom dates')] %}<option value="{{ k }}" {{ 'selected' if period==k }}>{{ l }}</option>{% endfor %}
+    </select>
+    <span id="custom" style="display:{{ 'inline' if period=='custom' else 'none' }}"><input type="date" name="from" value="{{ date_from }}"> to <input type="date" name="to" value="{{ date_to }}"></span>
+    <button class="btn btn-outline">Show</button>
+  </form>
+</div>
+
+{% if my_awards %}
+<div class="card notice-card">
+  <h2>&#127942; Your awards</h2>
+  {% for a in my_awards %}<div class="notice-row"><strong>{{ a.title }}</strong>{% if a.prize %} &middot; Prize: {{ a.prize }}{% endif %} <span class="hint">&middot; {{ a.created_at[:10] }}{% if a.period_from %} &middot; for {{ a.period_from }} to {{ a.period_to }}{% endif %}</span>{% if a.note %}<div class="hint">{{ a.note }}</div>{% endif %}</div>{% endfor %}
+</div>
+{% endif %}
+
+<div class="grid grid-3">
+  <div class="card table-wrap" style="grid-column: span 2">
+    <table>
+      <tr><th>Rank</th><th>Staff</th>{% if not bid %}<th>Branch</th>{% endif %}<th class="num">Bills</th><th class="num">Items sold</th><th class="num">Avg bill</th><th class="num">Credit given</th><th class="num">Total sales</th></tr>
+      {% for r in rows %}
+      <tr class="{{ 'rank-1' if loop.index==1 }} {{ 'me' if r.id==current_user.id }}">
+        <td class="rank">{% if loop.index==1 %}&#129351;{% elif loop.index==2 %}&#129352;{% elif loop.index==3 %}&#129353;{% else %}{{ loop.index }}{% endif %}</td>
+        <td><strong>{{ r.full_name }}</strong> <small class="hint">{{ r.role }}</small>{% if r.id==current_user.id %} <span class="tag upi">you</span>{% endif %}</td>
+        {% if not bid %}<td>{{ r.branch }}</td>{% endif %}
+        <td class="num">{{ r.bills }}</td><td class="num">{{ r.items|qty }}</td><td class="num">{{ r.avg_bill|inr }}</td><td class="num">{{ r.credit|inr }}</td><td class="num"><strong>{{ r.amount|inr }}</strong></td>
+      </tr>
+      {% else %}<tr><td colspan="8" class="empty">No bills in this period.</td></tr>{% endfor %}
+    </table>
+    <p class="hint">Ranked by total sales. Every bill counts toward the person who was logged in when it was made.</p>
+  </div>
+  <div>
+    {% if current_user.role in ['admin','manager'] %}
+    <div class="card">
+      <h2>&#127942; Give a prize</h2>
+      <form method="post" action="{{ url_for('award_give', period=period) }}">
+        <div class="field"><label>Staff</label>
+          <select name="user_id" required>{% for r in rows %}<option value="{{ r.id }}">{{ loop.index }}. {{ r.full_name }}{% if not bid %} ({{ r.branch }}){% endif %}</option>{% endfor %}</select></div>
+        <div class="field"><label>Title</label><input type="text" name="title" required placeholder="e.g. Star Cashier of the Month"></div>
+        <div class="field"><label>Prize</label><input type="text" name="prize" placeholder="e.g. ₹1,000 bonus / gift voucher"></div>
+        <div class="field"><label>Note</label><input type="text" name="note" placeholder="optional"></div>
+        <input type="hidden" name="period_from" value="{{ date_from }}"><input type="hidden" name="period_to" value="{{ date_to }}">
+        <button class="btn btn-accent" {{ 'disabled' if not rows }}>Give prize</button>
+      </form>
+      <p class="hint">The winner gets a notice popup. The award is listed here for everyone in the branch to see.</p>
+    </div>
+    {% endif %}
+    <div class="card">
+      <h2>Recent awards</h2>
+      {% for a in awards %}
+      <div class="notice-row"><strong>{{ a.staff }}</strong> &mdash; {{ a.title }}{% if a.prize %} <span class="hint">({{ a.prize }})</span>{% endif %}<br>
+        <small class="hint">by {{ a.giver }} &middot; {{ a.created_at[:10] }}{% if not bid %} &middot; {{ a.branch }}{% endif %}</small>
+        {% if current_user.role=='admin' %}<form method="post" action="{{ url_for('award_delete', aid=a.id) }}" style="display:inline" onsubmit="return confirm('Remove this award?')"><button class="btn-link danger" style="font-size:12px">remove</button></form>{% endif %}</div>
+      {% else %}<p class="hint">No awards given yet.</p>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Stock{% endblock %}
+{% from '_export.html' import export_buttons %}
+{% block content %}
+<div class="toolbar">
+  <h1>{{ 'Low stock items' if only_low else 'Stock' }} <small class="hint">{{ current_branch.name }}</small></h1>
+  <form method="get">
+    <input type="search" name="q" value="{{ search }}" placeholder="Search item...">
+    <label class="checkbox"><input type="checkbox" name="low" value="1" {{ 'checked' if only_low }}> Low stock only</label>
+    <button class="btn btn-outline">Filter</button>
+  </form>
+  <div>{{ export_buttons('stock_export', {'low': '1' if only_low else ''}) }}
+  {% if current_user.role in ['admin','manager'] %}
+  <a href="{{ url_for('stock_history') }}" class="btn btn-outline">History</a>
+       {% if all_branches and all_branches|length > 1 %}<a href="{{ url_for('stock_transfer') }}" class="btn btn-outline">Transfer to branch</a>{% endif %}
+       <a href="{{ url_for('purchase_new') }}" class="btn">+ Purchase (stock in)</a>
+  {% endif %}
+  </div>
+</div>
+<div class="card table-wrap">
+<table>
+  <tr><th>Item</th><th>Category</th><th class="num">Quantity</th><th>Unit</th><th class="num">Alert level</th><th class="num">Cost / unit</th><th class="num">Sell price</th><th class="num">Stock value (cost)</th>{% if current_user.role in ['admin','manager'] %}<th>Adjust</th>{% endif %}</tr>
+  {% for r in rows %}
+  <tr>
+    <td><strong>{{ r.name }}</strong></td><td>{{ r.category or '-' }}</td>
+    <td class="num {{ 'low' if r.qty <= r.low_stock_level }}">{{ r.qty|qty }}</td><td>{{ r.unit }}</td>
+    <td class="num">{{ r.low_stock_level|qty }}</td><td class="num">{{ r.purchase_price|inr }}</td><td class="num">{{ r.selling_price|inr }}</td><td class="num">{{ (r.qty * r.purchase_price)|inr }}</td>
+    {% if current_user.role in ['admin','manager'] %}
+    <td><form method="post" action="{{ url_for('stock_adjust') }}" class="inline-form">
+        <input type="hidden" name="product_id" value="{{ r.id }}">
+        <input type="number" step="0.001" name="change_qty" placeholder="+/- qty" style="width:90px" required>
+        <input type="text" name="reason" placeholder="Reason" style="width:140px">
+        <button class="btn btn-sm btn-outline">Apply</button></form></td>
+    {% endif %}
+  </tr>
+  {% else %}<tr><td colspan="9" class="empty">{% if only_low %}No item is at or below its alert level. <a href="{{ url_for('stock') }}">Show all stock</a>{% else %}No items.{% endif %}</td></tr>{% endfor %}
+</table>
+</div>
+<div class="card" style="background:#fffbeb;border-left:4px solid var(--accent)">
+  <strong>Bought new stock, maybe at a new price?</strong> Do not use Adjust for that. Click
+  <a href="{{ url_for('purchase_new') }}"><strong>+ Purchase (stock in)</strong></a>, add the item, enter the quantity and the new <strong>Unit cost</strong>,
+  and optionally a <strong>New sell price</strong>. Keep "Update cost?" ticked and the product's cost changes when you save.
+  <br><span class="hint">Adjust is only for corrections: damage, expiry, or a counting difference. Use a negative number to remove stock.</span>
+</div>
+<p class="hint">Total stock value at cost: <strong>{{ stock_value|inr }}</strong>.</p>
+{% endblock %}

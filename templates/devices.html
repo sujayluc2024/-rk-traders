@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Device locks{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>Device locks {% if current_user.role != 'admin' %}<small class="hint">{{ current_branch.name }} cashiers</small>{% endif %}</h1></div>
+<div class="grid grid-3">
+  <div class="card table-wrap" style="grid-column: span 2">
+    <table>
+      <tr><th>Staff</th><th>Role</th><th>Branch</th><th>Lock</th><th>Registered device</th><th>Since</th><th></th></tr>
+      {% for u in rows %}
+      <tr>
+        <td><strong>{{ u.full_name }}</strong><br><small class="hint">{{ u.username }}</small></td><td>{{ u.role }}</td><td>{{ u.branch_name or 'All' }}</td>
+        <td>{% if u.device_lock %}<span class="tag cash">On</span>{% else %}<span class="tag">Off</span>{% endif %}</td>
+        <td>{% if u.device_lock and u.bound_ip %}<code>{{ u.bound_ip }}</code>{% elif u.device_lock %}<span class="hint">locks on next login</span>{% else %}-{% endif %}</td>
+        <td>{{ u.bound_at or '-' }}</td>
+        <td>{% if u.device_lock and u.bound_ip %}
+          <form method="post" action="{{ url_for('user_reset_device', uid=u.id) }}" onsubmit="return confirm('Reset device for {{ u.full_name }}? Their next login will register a new computer.')"><button class="btn btn-sm btn-outline">Reset device</button></form>
+          {% endif %}</td>
+      </tr>
+      {% else %}<tr><td colspan="7" class="empty">No staff to show.</td></tr>{% endfor %}
+    </table>
+    <p class="hint">Reset when a computer is replaced or its network address has changed. {% if current_user.role == 'admin' %}Turn the lock on or off per user under Users.{% endif %}</p>
+  </div>
+  <div class="card">
+    <h2>Recent blocked logins</h2>
+    <table><tr><th>When</th><th>User</th><th>From</th></tr>
+      {% for b in blocked %}<tr><td><small>{{ b.at }}</small></td><td>{{ b.username }}</td><td><code>{{ b.ip }}</code></td></tr>
+      {% else %}<tr><td colspan="3" class="empty">None.</td></tr>{% endfor %}</table>
+  </div>
+</div>
+{% endblock %}

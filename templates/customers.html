@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Customers{% endblock %}
+{% from '_export.html' import export_buttons %}
+{% block content %}
+<div class="toolbar">
+  <h1>Customers</h1>
+  <form method="get"><input type="search" name="q" value="{{ search }}" placeholder="Name or phone..."><button class="btn btn-outline">Search</button></form>
+  <div>{{ export_buttons('customers_export', {}) }} <button class="btn" onclick="openForm()">+ Add Customer</button></div>
+</div>
+<div class="card table-wrap"><table>
+  <tr><th>Name</th><th>Phone</th><th>Address</th><th class="num">Udhaar due</th><th></th></tr>
+  {% for c in customers %}
+  <tr><td><a href="{{ url_for('customer_detail', cid=c.id) }}"><strong>{{ c.name }}</strong></a></td><td>{{ c.phone or '-' }}</td><td>{{ c.address or '-' }}</td>
+      <td class="num {{ 'low' if c.credit_balance > 0 }}">{{ c.credit_balance|inr }}</td>
+      <td><button class="btn btn-sm btn-outline" onclick='openForm({{ dict(c)|tojson }})'>Edit</button></td></tr>
+  {% else %}<tr><td colspan="5" class="empty">No customers yet. Walk-in sales do not need a customer.</td></tr>{% endfor %}
+</table></div>
+<p class="hint">Total udhaar outstanding: <strong>{{ total_credit|inr }}</strong></p>
+
+<div class="modal" id="modal"><div class="box">
+  <h2 id="mtitle">Add customer</h2>
+  <form method="post">
+    <input type="hidden" name="id" id="f_id">
+    <div class="field"><label>Name *</label><input type="text" name="name" id="f_name" required></div>
+    <div class="field"><label>Phone</label><input type="text" name="phone" id="f_phone"></div>
+    <div class="field"><label>Address</label><textarea name="address" id="f_address" rows="2"></textarea></div>
+    <button class="btn">Save</button> <button type="button" class="btn btn-outline" onclick="document.getElementById('modal').classList.remove('open')">Cancel</button>
+  </form>
+</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+function openForm(c) {
+  c = c || {};
+  document.getElementById('mtitle').textContent = c.id ? 'Edit customer' : 'Add customer';
+  for (const k of ['id','name','phone','address']) document.getElementById('f_'+k).value = c[k] || '';
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('f_name').focus();
+}
+</script>
+{% endblock %}

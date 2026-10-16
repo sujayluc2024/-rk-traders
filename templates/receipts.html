@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Receipts{% endblock %}
+{% from '_export.html' import export_buttons %}
+{% block content %}
+<div class="toolbar">
+  <h1>Payment receipts <small class="hint">{{ current_branch.name }}</small></h1>
+  <form method="get">
+    <input type="date" name="from" value="{{ date_from }}"> <span>to</span> <input type="date" name="to" value="{{ date_to }}">
+    <button class="btn btn-outline">Show</button>
+  </form>
+  <div>{{ export_buttons('receipts_export', {'from': date_from, 'to': date_to}) }} <a href="{{ url_for('customers') }}" class="btn btn-outline">Customers</a></div>
+</div>
+<div class="card table-wrap"><table>
+  <tr><th>Receipt no</th><th>Date</th><th>Customer</th><th>Mode</th><th>Note</th><th class="num">Amount</th><th class="num">Balance after</th><th>By</th><th></th></tr>
+  {% for r in receipts %}
+  <tr>
+    <td><a href="{{ url_for('receipt_detail', rid=r.id) }}"><strong>{{ r.receipt_no or 'Receipt #' ~ r.id }}</strong></a></td><td>{{ r.date }}</td>
+    <td><a href="{{ url_for('customer_detail', cid=r.customer_id) }}">{{ r.customer }}</a></td><td>{{ r.mode }}</td><td>{{ r.note }}</td>
+    <td class="num">{{ r.amount|inr }}</td><td class="num">{{ r.new_balance|inr }}</td><td>{{ r.user or '-' }}</td>
+    <td style="white-space:nowrap"><a href="{{ url_for('receipt_detail', rid=r.id, print=1) }}" target="_blank" class="btn btn-sm btn-outline">Print</a>
+      {% if current_user.role == 'admin' %}<form method="post" action="{{ url_for('receipt_delete', rid=r.id) }}" style="display:inline" onsubmit="return confirm('Cancel receipt {{ r.receipt_no }}? The amount becomes due again.')"><button class="btn btn-sm btn-danger">Cancel</button></form>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="9" class="empty">No receipts in this period.</td></tr>{% endfor %}
+  {% if receipts %}<tr><th colspan="5" class="num">Total collected ({{ receipts|length }} receipts)</th><th class="num">{{ total|inr }}</th><th colspan="3"></th></tr>{% endif %}
+</table></div>
+{% endblock %}

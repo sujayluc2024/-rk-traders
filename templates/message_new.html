@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}New message{% endblock %}
+{% block content %}
+<div class="card" style="max-width:720px">
+  <h1>{{ 'Request stock from another branch' if kind=='stock_request' else 'New message' }}</h1>
+  {% if not others %}<p class="flash flash-error">There is no other active branch to send to.</p>{% endif %}
+  <form method="post">
+    <input type="hidden" name="kind" value="{{ kind }}">
+    <div class="field"><label>To branch</label>
+      <select name="to_branch_id" id="to_branch" required>{% for b in others %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}</select></div>
+    {% if kind == 'stock_request' %}
+    <div class="field"><label>Product</label>
+      <div class="search-box">
+        <input type="text" id="psearch" placeholder="Type product name..." autocomplete="off" value="{{ product_name }}" required>
+        <input type="hidden" name="product_id" id="product_id" value="{{ product_id }}">
+        <div class="suggest" id="suggest" style="display:none"></div>
+      </div>
+      <p class="hint" id="stockinfo"></p>
+    </div>
+    <div class="field" style="max-width:220px"><label>Quantity needed</label><input type="number" step="0.001" min="0.001" name="quantity" required></div>
+    {% endif %}
+    <div class="field"><label>Subject {% if kind=='stock_request' %}<span class="hint">(optional, filled automatically)</span>{% endif %}</label><input type="text" name="subject" {{ 'required' if kind!='stock_request' }}></div>
+    <div class="field"><label>Message</label><textarea name="body" rows="5" placeholder="{{ 'Any note for the other branch, e.g. when you need it by' if kind=='stock_request' else 'Write your message' }}"></textarea></div>
+    <button class="btn" {{ 'disabled' if not others }}>Send</button> <a href="{{ url_for('messages') }}" class="btn btn-outline">Cancel</a>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+{% if kind == 'stock_request' %}
+<script>
+const ps = document.getElementById('psearch'), sug = document.getElementById('suggest'), pid = document.getElementById('product_id');
+let timer, results = [], sel = -1;
+ps.addEventListener('input', () => { pid.value = ''; clearTimeout(timer); timer = setTimeout(doSearch, 150); });
+ps.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown') { sel = Math.min(sel + 1, results.length - 1); paint(); e.preventDefault(); }
+  else if (e.key === 'ArrowUp') { sel = Math.max(sel - 1, 0); paint(); e.preventDefault(); }
+  else if (e.key === 'Enter') { if (results[sel]) pick(results[sel]); e.preventDefault(); }
+});
+async function doSearch() {
+  const v = ps.value.trim(); if (!v) { sug.style.display = 'none'; return; }
+  results = await (await fetch('/api/products/search?q=' + encodeURIComponent(v))).json();
+  sel = results.length ? 0 : -1; paint();
+}
+function paint() {
+  sug.innerHTML = results.map((p, i) => `<div class="${i===sel?'sel':''}" onmousedown="pick(results[${i}])"><span>${p.name}</span><span class="meta">we have ${p.qty} ${p.unit}</span></div>`).join('') || '<div class="meta">No match</div>';
+  sug.style.display = 'block';
+}
+async function pick(p) {
+  pid.value = p.id; ps.value = p.name; sug.style.display = 'none';
+  const rows = await (await fetch('/api/branch-stock?product_id=' + p.id)).json();
+  document.getElementById('stockinfo').textContent = 'Stock at each branch: ' + rows.map(r => `${r.name} ${r.qty} ${p.unit}`).join(' · ');
+}
+document.addEventListener('click', e => { if (!e.target.closest('.search-box')) sug.style.display = 'none'; });
+document.querySelector('form').addEventListener('submit', e => { if (!pid.value) { e.preventDefault(); alert('Pick a product from the list.'); ps.focus(); } });
+{% if product_id %}fetch('/api/branch-stock?product_id={{ product_id }}').then(r => r.json()).then(rows => { document.getElementById('stockinfo').textContent = 'Stock at each branch: ' + rows.map(r => `${r.name} ${r.qty}`).join(' · '); });{% endif %}
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Branches{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>Branches &amp; billing counters</h1><a href="{{ url_for('settings_page') }}" class="btn btn-outline">Back to settings</a></div>
+<div class="grid grid-2">
+  <div>
+    <div class="card table-wrap">
+      <h2>Branches</h2>
+      <table><tr><th>Code</th><th>Name</th><th>Address</th><th>GSTIN</th><th class="num">Counters</th><th></th></tr>
+      {% for b in branches %}
+      <tr><td><strong>{{ b.code }}</strong></td><td>{{ b.name }}{% if not b.active %} <span class="tag">inactive</span>{% endif %}</td><td>{{ b.address or '-' }}</td><td>{{ b.gstin or '-' }}</td><td class="num">{{ b.n_counters }}</td>
+          <td><button class="btn btn-sm btn-outline" onclick='editBranch({{ dict(b)|tojson }})'>Edit</button></td></tr>
+      {% endfor %}</table>
+    </div>
+    <div class="card table-wrap">
+      <h2>Counters</h2>
+      <table><tr><th>Branch</th><th>Code</th><th>Name</th><th class="num">Next bill no</th><th></th></tr>
+      {% for c in counters %}
+      <tr><td>{{ c.branch_name }}</td><td><strong>{{ c.code }}</strong></td><td>{{ c.name }}{% if not c.active %} <span class="tag">inactive</span>{% endif %}</td><td class="num">{{ c.next_seq }}</td>
+          <td><button class="btn btn-sm btn-outline" onclick='editCounter({{ dict(c)|tojson }})'>Edit</button></td></tr>
+      {% endfor %}</table>
+    </div>
+  </div>
+  <div>
+    <div class="card">
+      <h2 id="btitle">Add branch</h2>
+      <form method="post" action="{{ url_for('branches') }}">
+        <input type="hidden" name="id" id="b_id">
+        <div class="row">
+          <div class="field" style="flex:0 0 120px"><label>Code *</label><input type="text" name="code" id="b_code" required maxlength="6" placeholder="e.g. KOL"></div>
+          <div class="field"><label>Name *</label><input type="text" name="name" id="b_name" required></div>
+        </div>
+        <div class="field"><label>Address</label><input type="text" name="address" id="b_address"></div>
+        <div class="row">
+          <div class="field"><label>Phone</label><input type="text" name="phone" id="b_phone"></div>
+          <div class="field"><label>GSTIN (if different)</label><input type="text" name="gstin" id="b_gstin"></div>
+        </div>
+        <div class="field" id="b_active_wrap" style="display:none"><label class="checkbox"><input type="checkbox" name="active" id="b_active" checked> Active</label></div>
+        <button class="btn">Save branch</button> <button type="button" class="btn btn-outline" onclick="editBranch()">Clear</button>
+      </form>
+      <p class="hint">The branch code appears in every invoice number, e.g. KOL/C1/2627/00012. A new branch gets Counter 1 automatically.</p>
+    </div>
+    <div class="card">
+      <h2 id="ctitle">Add counter</h2>
+      <form method="post" action="{{ url_for('counters_save') }}">
+        <input type="hidden" name="id" id="c_id">
+        <div class="field" id="c_branch_wrap"><label>Branch</label>
+          <select name="branch_id" id="c_branch">{% for b in branches if b.active %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}</select></div>
+        <div class="row">
+          <div class="field" style="flex:0 0 120px"><label>Code *</label><input type="text" name="code" id="c_code" required maxlength="6" placeholder="e.g. C2"></div>
+          <div class="field"><label>Name *</label><input type="text" name="name" id="c_name" required placeholder="e.g. Counter 2"></div>
+        </div>
+        <div class="field" id="c_active_wrap" style="display:none"><label class="checkbox"><input type="checkbox" name="active" id="c_active" checked> Active</label></div>
+        <button class="btn">Save counter</button> <button type="button" class="btn btn-outline" onclick="editCounter()">Clear</button>
+      </form>
+      <p class="hint">Each counter keeps its own bill number sequence, so two counters can bill at the same time without clashing.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function editBranch(b) {
+  b = b || {};
+  document.getElementById('btitle').textContent = b.id ? 'Edit branch ' + b.code : 'Add branch';
+  for (const k of ['id','code','name','address','phone','gstin']) document.getElementById('b_'+k).value = b[k] || '';
+  document.getElementById('b_active').checked = b.id ? !!b.active : true;
+  document.getElementById('b_active_wrap').style.display = b.id ? 'block' : 'none';
+}
+function editCounter(c) {
+  c = c || {};
+  document.getElementById('ctitle').textContent = c.id ? 'Edit counter ' + c.code : 'Add counter';
+  for (const k of ['id','code','name']) document.getElementById('c_'+k).value = c[k] || '';
+  if (c.branch_id) document.getElementById('c_branch').value = c.branch_id;
+  document.getElementById('c_branch_wrap').style.display = c.id ? 'none' : 'block';
+  document.getElementById('c_active').checked = c.id ? !!c.active : true;
+  document.getElementById('c_active_wrap').style.display = c.id ? 'block' : 'none';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ n.title }}{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>Notice</h1>
+  <div>{% if is_sender %}<form method="post" action="{{ url_for('notice_delete', nid=n.id) }}" style="display:inline" onsubmit="return confirm('Delete this notice for everyone?')"><button class="btn btn-danger">Delete</button></form>{% endif %}
+  <a href="{{ url_for('notices') }}" class="btn btn-outline">Back</a></div></div>
+<div class="grid grid-3">
+  <div class="card" style="grid-column: span 2">
+    <h2>{{ n.title }}</h2>
+    <p class="hint">From <strong>{{ n.sender }}</strong> ({{ n.sender_role }}) &middot; {{ n.created_at }} &middot; To: {{ n.audience }}</p>
+    <div class="notice-body">{{ n.body or '(no text)' }}</div>
+  </div>
+  {% if is_sender %}
+  <div class="card">
+    <h2>Read status</h2>
+    <table><tr><th>Staff</th><th>Branch</th><th>Read at</th></tr>
+      {% for r in recipients %}<tr><td>{{ r.full_name }} <small class="hint">{{ r.role }}</small></td><td>{{ r.branch_name or '-' }}</td><td>{{ r.read_at or '<span class="low">Not yet</span>'|safe }}</td></tr>{% endfor %}
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

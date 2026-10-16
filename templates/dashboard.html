@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - {{ settings.shop_name }}{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>Dashboard <small class="hint">{{ current_branch.name }} &middot; {{ today }}</small></h1>
+  <a href="{{ url_for('billing') }}" class="btn btn-accent">+ New Bill</a>
+</div>
+
+{% if notices %}
+<div class="card notice-card">
+  <h2>New notices</h2>
+  {% for n in notices %}
+  <div class="notice-row"><a href="{{ url_for('notice_detail', nid=n.id) }}"><strong>{{ n.title }}</strong></a> <span class="hint">from {{ n.sender }} &middot; {{ n.created_at }}</span>
+    {% if n.body %}<div class="hint">{{ n.body[:140] }}{{ '...' if n.body|length > 140 }}</div>{% endif %}</div>
+  {% endfor %}
+  <a href="{{ url_for('notices') }}" class="hint">All notices &rarr;</a>
+</div>
+{% endif %}
+<div class="grid grid-4">
+  <div class="stat info"><div class="label">Today's sales</div><div class="value">{{ today_stats.total|inr }}</div><div class="sub">{{ today_stats.bills }} bills</div></div>
+  <div class="stat good"><div class="label">Cash / UPI / Card today</div><div class="value" style="font-size:18px">{{ today_stats.cash|inr }} / {{ today_stats.upi|inr }} / {{ today_stats.card|inr }}</div><div class="sub">Credit given: {{ today_stats.credit|inr }}</div></div>
+  <div class="stat info"><div class="label">This month</div><div class="value">{{ month.total|inr }}</div><div class="sub">{{ month.bills }} bills</div></div>
+  <div class="stat warn"><div class="label">Low stock items</div><div class="value">{{ low_count }}</div><div class="sub"><a href="{{ url_for('stock', low=1) }}">View list</a> &middot; Udhaar due: {{ udhaar|inr }}</div></div>
+</div>
+
+<div class="grid grid-2" style="margin-top:18px">
+  <div class="card">
+    <h2>Recent bills</h2>
+    <div class="table-wrap"><table>
+      <tr><th>Invoice</th><th>Customer</th><th>Mode</th><th class="num">Amount</th></tr>
+      {% for s in recent %}
+      <tr><td><a href="{{ url_for('sale_detail', sid=s.id) }}">{{ s.invoice_no }}</a><br><small class="hint">{{ s.created_at }}</small></td>
+          <td>{{ s.customer or 'Walk-in' }}</td><td><span class="tag {{ s.payment_mode|lower }}">{{ s.payment_mode }}</span></td>
+          <td class="num">{{ s.grand_total|inr }}</td></tr>
+      {% else %}<tr><td colspan="4" class="empty">No bills yet. Click New Bill to start.</td></tr>{% endfor %}
+    </table></div>
+  </div>
+  <div>
+    <div class="card">
+      <h2>Low stock</h2>
+      <table>
+        <tr><th>Item</th><th class="num">In stock</th><th class="num">Alert level</th></tr>
+        {% for p in low %}<tr><td>{{ p.name }}</td><td class="num low">{{ p.qty|qty }} {{ p.unit }}</td><td class="num">{{ p.low_stock_level|qty }}</td></tr>
+        {% else %}<tr><td colspan="3" class="empty">All items are above alert level.</td></tr>{% endfor %}
+      </table>
+    </div>
+    <div class="card">
+      <h2>Top sellers (last 7 days)</h2>
+      <table>
+        <tr><th>Item</th><th class="num">Qty</th><th class="num">Sales</th></tr>
+        {% for t in top %}<tr><td>{{ t.name }}</td><td class="num">{{ t.qty|qty }}</td><td class="num">{{ t.amount|inr }}</td></tr>
+        {% else %}<tr><td colspan="3" class="empty">No sales in the last 7 days.</td></tr>{% endfor %}
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

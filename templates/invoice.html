@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Invoice {{ s.invoice_no }}</title>
+<style>
+  @page { size: A4; margin: 12mm; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #000; font-size: 13px; margin: 0; background: #e9ecef; }
+  .sheet { width: 210mm; min-height: 280mm; margin: 16px auto; background: #fff; padding: 14mm; box-sizing: border-box; position: relative; }
+  .actions { width: 210mm; margin: 12px auto 0; display: flex; gap: 10px; }
+  .actions a, .actions button { padding: 9px 16px; border-radius: 6px; border: 1px solid #0f766e; background: #0f766e; color: #fff; font-size: 14px; cursor: pointer; text-decoration: none; }
+  .actions a.alt { background: #fff; color: #0f766e; }
+  .head { display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 10px; }
+  .shop h1 { margin: 0; font-size: 26px; letter-spacing: .02em; }
+  .shop p { margin: 2px 0; }
+  .meta { text-align: right; }
+  .meta h2 { margin: 0 0 6px; font-size: 18px; }
+  .meta p { margin: 2px 0; }
+  .parties { display: flex; justify-content: space-between; margin: 12px 0; }
+  .parties div { width: 48%; }
+  .parties h4 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; color: #555; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th, td { border: 1px solid #000; padding: 5px 7px; }
+  th { background: #f1f3f5; font-size: 12px; text-transform: uppercase; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .summary { display: flex; justify-content: space-between; margin-top: 12px; gap: 16px; }
+  .summary .tax { width: 55%; }
+  .summary .tax table { margin: 0; }
+  .summary .tot { width: 42%; }
+  .summary .tot table { margin: 0; }
+  .summary .tot td { border: none; border-bottom: 1px solid #ddd; padding: 5px 7px; }
+  .summary .tot tr.grand td { font-size: 18px; font-weight: 700; border-top: 2px solid #000; border-bottom: 2px solid #000; }
+  .words { margin-top: 10px; font-style: italic; }
+  .footer { margin-top: 28px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .footer .sign { text-align: center; width: 220px; border-top: 1px solid #000; padding-top: 4px; }
+  .note { font-size: 12px; color: #444; margin-top: 16px; text-align: center; }
+  @media print { body { background: #fff; } .sheet { margin: 0; padding: 0; width: auto; min-height: auto; } .actions { display: none; } }
+</style>
+</head>
+<body>
+<div class="actions">
+  <button onclick="window.print()">Print</button>
+  <a class="alt" href="{{ url_for('billing') }}">New bill</a>
+  <a class="alt" href="{{ url_for('sales') }}">All bills</a>
+</div>
+<div class="sheet">
+  <div class="head">
+    <div class="shop">
+      <h1>{{ settings.shop_name }}</h1>
+      <p>{{ settings.shop_tagline }}</p>
+      <p>{{ s.branch_address or settings.shop_address }}</p>
+      {% if s.branch_phone or settings.shop_phone %}<p>Phone: {{ s.branch_phone or settings.shop_phone }}</p>{% endif %}
+      {% if s.branch_gstin or settings.shop_gstin %}<p><strong>GSTIN: {{ s.branch_gstin or settings.shop_gstin }}</strong> &nbsp; State: {{ settings.state_name }} ({{ settings.state_code }})</p>{% endif %}
+    </div>
+    <div class="meta">
+      <h2>{{ 'TAX INVOICE' if (s.branch_gstin or settings.shop_gstin) else 'CASH MEMO' }}</h2>
+      <p><strong>Invoice No:</strong> {{ s.invoice_no }}</p>
+      <p><strong>Date:</strong> {{ s.created_at }}</p>
+      <p><strong>Branch:</strong> {{ s.branch_name }} &nbsp; <strong>Counter:</strong> {{ s.counter_name }}</p>
+      <p><strong>Cashier:</strong> {{ s.cashier or '-' }}</p>
+    </div>
+  </div>
+
+  <div class="parties">
+    <div>
+      <h4>Bill to</h4>
+      <p style="margin:0"><strong>{{ s.customer or 'Walk-in Customer' }}</strong></p>
+      {% if s.customer_phone %}<p style="margin:0">{{ s.customer_phone }}</p>{% endif %}
+      {% if s.customer_address %}<p style="margin:0">{{ s.customer_address }}</p>{% endif %}
+    </div>
+    <div style="text-align:right">
+      <h4>Payment</h4>
+      <p style="margin:0"><strong>{{ s.payment_mode }}</strong>{% if s.credit_amount %} &mdash; paid {{ s.paid_amount|inr }}, credit {{ s.credit_amount|inr }}{% endif %}</p>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>#</th><th>Item</th><th>HSN</th><th class="num">Qty</th><th>Unit</th><th class="num">Rate</th><th class="num">GST %</th><th class="num">Taxable</th><th class="num">GST Amt</th><th class="num">Amount</th></tr></thead>
+    <tbody>
+      {% for i in items %}
+      <tr><td>{{ loop.index }}</td><td>{{ i.name }}{% if i.offer_discount %}<br><small>Offer: {{ i.offer_name }} (-{{ i.offer_discount|inr(false) }})</small>{% endif %}</td><td>{{ i.hsn or '' }}</td><td class="num">{{ i.quantity|qty }}</td><td>{{ i.unit }}</td>
+          <td class="num">{{ i.unit_price|inr(false) }}</td><td class="num">{{ i.gst_rate|qty }}%</td><td class="num">{{ i.taxable|inr(false) }}</td><td class="num">{{ i.tax|inr(false) }}</td><td class="num">{{ i.total|inr(false) }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="summary">
+    <div class="tax">
+      <table>
+        <thead><tr><th>GST rate</th><th class="num">Taxable</th><th class="num">CGST</th><th class="num">SGST</th><th class="num">Total tax</th></tr></thead>
+        <tbody>
+        {% for t in tax_summary %}
+        <tr><td>{{ t.gst_rate|qty }}%</td><td class="num">{{ t.taxable|inr(false) }}</td><td class="num">{{ (t.tax/2)|inr(false) }}</td><td class="num">{{ (t.tax/2)|inr(false) }}</td><td class="num">{{ t.tax|inr(false) }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="tot">
+      <table>
+        <tr><td>Subtotal</td><td class="num">{{ s.subtotal|inr }}</td></tr>
+        {% if s.offer_discount %}<tr><td>Offer savings</td><td class="num">- {{ s.offer_discount|inr }}</td></tr>{% endif %}
+        {% if s.discount %}<tr><td>Discount</td><td class="num">- {{ s.discount|inr }}</td></tr>{% endif %}
+        <tr><td>Taxable value</td><td class="num">{{ s.taxable|inr }}</td></tr>
+        <tr><td>CGST</td><td class="num">{{ s.cgst|inr }}</td></tr>
+        <tr><td>SGST</td><td class="num">{{ s.sgst|inr }}</td></tr>
+        <tr><td>Round off</td><td class="num">{{ s.round_off|inr }}</td></tr>
+        <tr class="grand"><td>Grand Total</td><td class="num">{{ s.grand_total|inr }}</td></tr>
+      </table>
+    </div>
+  </div>
+  <p class="words">Amount in words: <strong>Rupees {{ s.grand_total|words }} Only</strong></p>
+  {% if s.offer_discount %}<p style="text-align:center;font-weight:700;border:1px dashed #000;padding:6px;margin-top:8px">&#127881; You saved {{ s.offer_discount|inr }} on this bill with our offers!</p>{% endif %}
+
+  {% if s.payment_mode == 'Credit' %}
+  <div class="summary" style="margin-top:14px">
+    <div class="tax">
+      <table>
+        <thead><tr><th colspan="2">Credit (udhaar) account of {{ s.customer }}</th></tr></thead>
+        <tbody>
+          <tr><td>Previous balance due</td><td class="num">{{ s.prev_balance|inr }}</td></tr>
+          <tr><td>This bill amount</td><td class="num">{{ s.grand_total|inr }}</td></tr>
+          <tr><td>Paid now ({{ s.payment_mode }})</td><td class="num">- {{ s.paid_amount|inr }}</td></tr>
+          <tr><td>Credit on this bill</td><td class="num">{{ s.credit_amount|inr }}</td></tr>
+          <tr><td><strong>Total due after this bill</strong></td><td class="num"><strong>{{ (s.prev_balance + s.credit_amount)|inr }}</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tot">
+      {% if receipts_applied %}
+      <table style="border:1px solid #000">
+        <thead><tr><th colspan="3">Payments received against this invoice</th></tr><tr><th>Receipt no</th><th>Date</th><th class="num">Amount</th></tr></thead>
+        <tbody>{% for r in receipts_applied %}<tr><td>{{ r.receipt_no }}</td><td>{{ r.date }}</td><td class="num">{{ r.amount|inr }}</td></tr>{% endfor %}
+          <tr><td colspan="2"><strong>Still due on this invoice</strong></td><td class="num"><strong>{{ (s.credit_amount - s.credit_paid)|inr }}</strong></td></tr></tbody>
+      </table>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="footer">
+    <div class="note" style="text-align:left;margin:0">{{ settings.invoice_footer }}</div>
+    <div class="sign">For {{ settings.shop_name }}<br><br>Authorised Signatory</div>
+  </div>
+</div>
+{% if autoprint %}<script>window.addEventListener('load', () => setTimeout(() => window.print(), 300));</script>{% endif %}
+</body>
+</html>

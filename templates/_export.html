@@ -1,0 +1,7 @@
+{% macro export_buttons(endpoint, params) -%}
+<span class="export-group">
+  <a class="btn btn-sm" href="{{ url_for(endpoint, fmt='xlsx', **params) }}" title="Download as Excel">&#128202; Excel</a>
+  <a class="btn btn-sm btn-outline" href="{{ url_for(endpoint, fmt='csv', **params) }}" title="Download as CSV">CSV</a>
+  <a class="btn btn-sm btn-outline" href="{{ url_for(endpoint, fmt='pdf', **params) }}" title="Download as PDF">PDF</a>
+</span>
+{%- endmacro %}

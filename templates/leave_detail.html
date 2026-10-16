@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Leave application{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>Leave application #{{ l.id }}</h1><a href="{{ url_for('leaves', box='mine' if is_owner else 'approvals') }}" class="btn btn-outline">Back</a></div>
+<div class="grid grid-3">
+  <div class="card" style="grid-column: span 2">
+    <table>
+      <tr><td style="width:180px">Applicant</td><td><strong>{{ l.applicant }}</strong> <small class="hint">{{ l.applicant_role }} &middot; {{ l.branch_name or '-' }}</small></td></tr>
+      <tr><td>Type</td><td>{{ l.leave_type }}</td></tr>
+      <tr><td>Period</td><td>{{ l.from_date }} to {{ l.to_date }} &middot; <strong>{{ l.days }} day(s)</strong></td></tr>
+      <tr><td>Reason</td><td style="white-space:pre-wrap">{{ l.reason or '-' }}</td></tr>
+      <tr><td>Document</td><td>{% if l.document %}<a href="{{ url_for('leave_document', lid=l.id) }}" target="_blank">&#128206; {{ l.document_name }}</a>{% else %}<span class="hint">None attached</span>{% endif %}</td></tr>
+      <tr><td>Applied on</td><td>{{ l.created_at }}</td></tr>
+      <tr><td>Status</td><td><span class="tag lv-{{ l.status }}" style="font-size:14px">{{ l.status|title }}</span></td></tr>
+      {% if l.decided_by %}<tr><td>Decision</td><td>By <strong>{{ l.decided_by_name }}</strong> on {{ l.decided_at }}{% if l.decision_note %}<br>Note: {{ l.decision_note }}{% endif %}</td></tr>{% endif %}
+      {% if l.overridden_by %}<tr><td>Admin override</td><td class="low">Changed to <strong>{{ l.status }}</strong> by {{ l.overridden_by_name }} on {{ l.overridden_at }}{% if l.override_note %}<br>Note: {{ l.override_note }}{% endif %}</td></tr>{% endif %}
+    </table>
+    {% if is_owner %}
+    <hr>
+    <form method="post" action="{{ url_for('leave_document', lid=l.id) }}" enctype="multipart/form-data" class="inline-form">
+      <div class="field"><label>{{ 'Replace document' if l.document else 'Attach a document' }}</label><input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png" required></div>
+      <button class="btn btn-sm btn-outline">Upload</button>
+    </form>
+    {% if l.status == 'pending' %}
+    <form method="post" action="{{ url_for('leave_cancel', lid=l.id) }}" style="margin-top:12px" onsubmit="return confirm('Withdraw this application?')"><button class="btn btn-sm btn-danger">Withdraw application</button></form>
+    {% endif %}
+    {% endif %}
+  </div>
+  <div>
+    {% if bal %}
+    <div class="card">
+      <h2>{{ l.leave_type }} leave balance {{ l.from_date[:4] }}</h2>
+      <table>
+        <tr><td>Entitled</td><td class="num">{{ bal.entitled if bal.limited else 'No limit' }}</td></tr>
+        <tr><td>Used (approved)</td><td class="num">{{ bal.used }}</td></tr>
+        <tr><td>Pending (incl. this)</td><td class="num">{{ bal.pending }}</td></tr>
+        {% if bal.limited %}<tr><td><strong>Left after pending</strong></td><td class="num"><strong class="{{ 'low' if bal.balance < 0 }}">{{ bal.balance }}</strong></td></tr>{% endif %}
+        {% if bal.eligible_from %}<tr><td>Available from</td><td class="num">{{ bal.eligible_from }}</td></tr>{% endif %}
+      </table>
+    </div>
+    {% endif %}
+    {% if can_decide %}
+    <div class="card">
+      <h2>Decision</h2>
+      <form method="post" action="{{ url_for('leave_decide', lid=l.id) }}">
+        <div class="field"><label>Note (optional)</label><textarea name="note" rows="2"></textarea></div>
+        <button class="btn" name="status" value="approved">Approve</button>
+        <button class="btn btn-danger" name="status" value="rejected">Reject</button>
+      </form>
+    </div>
+    {% endif %}
+    {% if can_override %}
+    <div class="card" style="border-left:4px solid var(--danger)">
+      <h2>Admin override</h2>
+      <p class="hint">This leave is currently <strong>{{ l.status }}</strong>{% if l.decided_by_name %} (decided by {{ l.decided_by_name }}){% endif %}. You can change the decision. Both the applicant and the original decider will be notified.</p>
+      <form method="post" action="{{ url_for('leave_decide', lid=l.id) }}">
+        <div class="field"><label>Reason for change</label><textarea name="note" rows="2" required></textarea></div>
+        {% if l.status == 'rejected' %}<button class="btn" name="status" value="approved">Change to Approved</button>
+        {% else %}<button class="btn btn-danger" name="status" value="rejected">Change to Rejected</button>{% endif %}
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

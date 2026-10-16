@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Stock history{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>Stock adjustments <small class="hint">{{ current_branch.name }}</small></h1><a href="{{ url_for('stock') }}" class="btn btn-outline">Back</a></div>
+<div class="card table-wrap"><table>
+  <tr><th>Date</th><th>Item</th><th class="num">Change</th><th>Reason</th><th>By</th></tr>
+  {% for r in rows %}<tr><td>{{ r.date }}</td><td>{{ r.name }}</td><td class="num {{ 'low' if r.change_qty < 0 }}">{{ '+' if r.change_qty > 0 }}{{ r.change_qty|qty }} {{ r.unit }}</td><td>{{ r.reason }}</td><td>{{ r.user or '-' }}</td></tr>
+  {% else %}<tr><td colspan="5" class="empty">No adjustments yet. Purchases and sales are not listed here, only manual changes.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

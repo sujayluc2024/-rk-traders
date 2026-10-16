@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>Settings</h1>
+  <div><a href="{{ url_for('branches') }}" class="btn btn-outline">Branches &amp; Counters</a> <a href="{{ url_for('users') }}" class="btn btn-outline">Users</a> <a href="{{ url_for('leave_policy') }}" class="btn btn-outline">Leave policy</a></div></div>
+<div class="card" style="max-width:720px">
+  <h2>Shop details (printed on every bill)</h2>
+  <form method="post">
+    <div class="row">
+      <div class="field"><label>Shop name</label><input type="text" name="shop_name" value="{{ settings.shop_name }}" required></div>
+      <div class="field"><label>Tagline</label><input type="text" name="shop_tagline" value="{{ settings.shop_tagline }}"></div>
+    </div>
+    <div class="field"><label>Head office address</label><input type="text" name="shop_address" value="{{ settings.shop_address }}"></div>
+    <div class="row">
+      <div class="field"><label>Phone</label><input type="text" name="shop_phone" value="{{ settings.shop_phone }}"></div>
+      <div class="field"><label>GSTIN (leave blank if not registered)</label><input type="text" name="shop_gstin" value="{{ settings.shop_gstin }}" placeholder="19XXXXXXXXXXXZ5"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>State</label><input type="text" name="state_name" value="{{ settings.state_name }}"></div>
+      <div class="field"><label>State code</label><input type="text" name="state_code" value="{{ settings.state_code }}"></div>
+    </div>
+    <div class="field"><label>Invoice footer note</label><textarea name="invoice_footer" rows="2">{{ settings.invoice_footer }}</textarea></div>
+    <div class="field"><label class="checkbox"><input type="checkbox" name="allow_negative_stock" {{ 'checked' if settings.allow_negative_stock=='1' }}> Allow billing when stock is zero (stock can go negative)</label></div>
+    <p class="hint">A branch can have its own address and GSTIN under Branches. If a branch has a GSTIN, it is printed instead of the one here. With a GSTIN the bill says TAX INVOICE, otherwise CASH MEMO.</p>
+    <button class="btn">Save settings</button>
+  </form>
+</div>
+{% endblock %}

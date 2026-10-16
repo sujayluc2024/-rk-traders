@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}{{ c.name }}{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>{{ c.name }} <small class="hint">{{ c.phone }}</small></h1>
+  <div><a href="{{ url_for('receipts') }}" class="btn btn-outline">All receipts</a> <a href="{{ url_for('customers') }}" class="btn btn-outline">Back</a></div></div>
+
+<div class="grid grid-3">
+  <div class="stat {{ 'warn' if c.credit_balance > 0 else 'good' }}"><div class="label">Udhaar due now</div><div class="value">{{ c.credit_balance|inr }}</div>
+    <div class="sub">{{ outstanding|length }} unpaid invoice(s)</div></div>
+  <div class="card" style="grid-column: span 2">
+    <h2>Receive payment</h2>
+    {% if c.credit_balance > 0 %}
+    <form method="post" action="{{ url_for('customer_payment', cid=c.id) }}" class="inline-form" id="payform">
+      <div class="field"><label>Amount &#8377;</label><input type="number" step="0.01" min="0.01" max="{{ c.credit_balance }}" name="amount" id="pay_amount" value="{{ c.credit_balance }}" required></div>
+      <div class="field"><label>Mode</label><select name="mode"><option>Cash</option><option>UPI</option><option>Card</option></select></div>
+      <div class="field"><label>Date</label><input type="date" name="date" value="{{ today }}"></div>
+      <div class="field"><label>Apply to</label>
+        <select name="sale_id" id="pay_sale"><option value="">Oldest invoices first</option>
+          {% for s in outstanding %}<option value="{{ s.id }}" {{ 'selected' if pay_sale|string == s.id|string }}>{{ s.invoice_no }} (due {{ s.due|inr }})</option>{% endfor %}</select></div>
+      <div class="field"><label>Note</label><input type="text" name="note" placeholder="optional"></div>
+      <button class="btn">Save &amp; print receipt</button>
+    </form>
+    <p class="hint">A receipt voucher with its own number is created and the amount is set off against the invoices listed below.</p>
+    {% else %}<p class="hint">Nothing is due from this customer.</p>{% endif %}
+  </div>
+</div>
+
+<div class="card table-wrap">
+  <h2>Unpaid invoices</h2>
+  <table>
+    <tr><th>Invoice</th><th>Date</th><th class="num">Bill total</th><th class="num">Put on credit</th><th class="num">Paid since</th><th class="num">Still due</th><th></th></tr>
+    {% for s in outstanding %}
+    <tr><td><a href="{{ url_for('sale_detail', sid=s.id) }}"><strong>{{ s.invoice_no }}</strong></a></td><td>{{ s.date }}</td>
+        <td class="num">{{ s.grand_total|inr }}</td><td class="num">{{ s.credit_amount|inr }}</td><td class="num">{{ s.credit_paid|inr }}</td>
+        <td class="num low">{{ s.due|inr }}</td>
+        <td><button type="button" class="btn btn-sm btn-outline" onclick="payThis({{ s.id }}, {{ s.due }})">Pay this</button></td></tr>
+    {% else %}<tr><td colspan="7" class="empty">All invoices are settled.</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="card table-wrap">
+  <h2>Statement (ledger)</h2>
+  <table>
+    <tr><th>Date</th><th>Particulars</th><th>Reference no</th><th class="num">Bill amount</th><th class="num">Credit taken</th><th class="num">Paid</th><th class="num">Balance</th></tr>
+    {% for r, bal in ledger %}
+    <tr>
+      <td>{{ r.date }}</td>
+      <td>{{ 'Sale on credit' if r.kind=='bill' and r.debit else ('Sale (' ~ r.note ~ ')' if r.kind=='bill' else 'Payment received ' ~ r.note) }}</td>
+      <td>{% if r.kind=='bill' %}<a href="{{ url_for('sale_detail', sid=r.id) }}">{{ r.ref }}</a>{% else %}<a href="{{ url_for('receipt_detail', rid=r.id) }}">{{ r.ref or 'Receipt #' ~ r.id }}</a>{% endif %}</td>
+      <td class="num">{{ r.bill_total|inr if r.kind=='bill' else '' }}</td>
+      <td class="num">{{ r.debit|inr if r.debit else '' }}</td>
+      <td class="num">{{ r.credit|inr if r.credit else '' }}</td>
+      <td class="num"><strong>{{ bal|inr }}</strong></td>
+    </tr>
+    {% else %}<tr><td colspan="7" class="empty">No transactions yet.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function payThis(id, due) {
+  document.getElementById('pay_sale').value = id;
+  document.getElementById('pay_amount').value = due.toFixed(2);
+  document.getElementById('pay_amount').focus();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+{% endblock %}

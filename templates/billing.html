@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Billing{% endblock %}
+{% block container_class %}wide{% endblock %}
+{% block content %}
+<div class="pos">
+  <div>
+    <div class="card">
+      <div class="search-box">
+        <input type="text" id="search" placeholder="Type product name and press Enter..." autocomplete="off" autofocus>
+        <div class="suggest" id="suggest" style="display:none"></div>
+      </div>
+      <p class="hint" style="margin:8px 0 0"><span class="kbd">↑</span> <span class="kbd">↓</span> choose &nbsp; <span class="kbd">Enter</span> add item &nbsp; <span class="kbd">F2</span> back to search &nbsp; <span class="kbd">F9</span> save &amp; print</p>
+    </div>
+    <div class="card table-wrap">
+      <table id="items">
+        <thead><tr><th>#</th><th>Item</th><th class="num">Qty</th><th>Unit</th><th class="num">Price &#8377;</th><th class="num">GST</th><th>Offer</th><th class="num">Amount</th><th></th></tr></thead>
+        <tbody><tr><td colspan="9" class="empty">Search a product above to start the bill.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" id="side">
+    <h3>Customer</h3>
+    <div class="search-box cust-pick">
+      <input type="text" id="cust" placeholder="Walk-in (optional: name / phone)" autocomplete="off" style="flex:1">
+      <button class="btn btn-sm btn-outline" type="button" onclick="newCustomer()" title="Add new customer">+</button>
+      <div class="suggest" id="csuggest" style="display:none"></div>
+    </div>
+    <p class="hint" id="custinfo"></p>
+
+    <h3 style="margin-top:14px">Totals</h3>
+    <div class="totals">
+      <div><span>Items</span><span id="n_items">0</span></div>
+      <div><span>Subtotal</span><span id="subtotal">&#8377;0.00</span></div>
+      <div class="offer-line" id="offerline" style="display:none"><span>&#127991; Offer savings <small id="offername"></small></span><span id="offerdisc">-&#8377;0.00</span></div>
+      <div><span>Discount &#8377;</span><span><input type="number" id="discount" step="0.01" min="0" value="0" style="width:100px;text-align:right"></span></div>
+      <div class="hint"><span>Taxable</span><span id="taxable">&#8377;0.00</span></div>
+      <div class="hint"><span>CGST + SGST</span><span id="tax">&#8377;0.00</span></div>
+      <div class="hint"><span>Round off</span><span id="roundoff">&#8377;0.00</span></div>
+      <div class="grand"><span>Total</span><span id="grand">&#8377;0</span></div>
+    </div>
+
+    <h3 style="margin-top:14px">Payment</h3>
+    <div class="pay-modes">
+      {% for m in PAYMENT_MODES %}<label><input type="radio" name="mode" value="{{ m }}" {{ 'checked' if loop.first }}><span>{{ m }}</span></label>{% endfor %}
+    </div>
+    <div id="creditbox" style="display:none">
+      <div class="field"><label>Amount paid now &#8377;</label><input type="number" id="paid" step="0.01" min="0" value="0"></div>
+      <p class="hint">Remaining <strong id="remaining">&#8377;0</strong> goes to the customer's udhaar.</p>
+    </div>
+    <div id="cashbox">
+      <div class="field"><label>Cash received &#8377; (optional, for change)</label><input type="number" id="received" step="1" min="0"></div>
+      <p class="hint">Change to return: <strong id="change">&#8377;0</strong></p>
+    </div>
+    <button class="btn btn-lg btn-accent" id="save">Save &amp; Print (F9)</button>
+    <button class="btn btn-lg btn-outline" id="clear" style="margin-top:8px">Clear bill</button>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='billing.js') }}"></script>{% endblock %}

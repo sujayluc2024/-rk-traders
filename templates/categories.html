@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Categories{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>Categories</h1><a href="{{ url_for('products') }}" class="btn btn-outline">Back to products</a></div>
+<div class="grid grid-2">
+  <div class="card">
+    <table><tr><th>Name</th><th class="num">Products</th><th></th></tr>
+    {% for c in categories %}
+    <tr><td>{{ c.name }}</td><td class="num">{{ c.n }}</td>
+      <td style="text-align:right"><form method="post" action="{{ url_for('category_delete', cid=c.id) }}" onsubmit="return confirm('Delete category {{ c.name }}? Products will stay but lose this category.')"><button class="btn-link danger">Delete</button></form></td></tr>
+    {% endfor %}</table>
+  </div>
+  <div class="card">
+    <h2>Add category</h2>
+    <form method="post" class="inline-form"><div class="field"><input type="text" name="name" required placeholder="Category name"></div><button class="btn">Add</button></form>
+  </div>
+</div>
+{% endblock %}

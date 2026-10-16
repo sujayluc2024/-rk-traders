@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ settings.shop_name }}{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script>try{if(localStorage.getItem("rk_nav")==="collapsed")document.documentElement.classList.add("nav-collapsed");}catch(e){}</script>
+{% block head %}{% endblock %}
+</head>
+<body class="{{ 'has-sidebar' if current_user }}">
+{% if current_user %}
+{% set ep = request.endpoint %}
+{% macro item(url, label, eps, icon) -%}
+  <a href="{{ url }}" class="{{ 'active' if ep in eps }}" title="{{ label }}"><span class="ico">{{ icon|safe }}</span><span class="lbl">{{ label }}</span>{{ caller() if caller }}</a>
+{%- endmacro %}
+<aside class="sidebar" id="sidebar">
+  <div class="brand-row">
+    <a class="brand" href="{{ url_for('dashboard') }}" title="{{ settings.shop_name }}"><span class="lbl">{{ settings.shop_name }}</span><span class="short">{{ settings.shop_name[:2]|upper }}</span></a>
+    <button type="button" class="collapse-btn" onclick="collapseSidebar()" title="Collapse / expand menu"><span class="lbl">&#171;</span><span class="short">&#187;</span></button>
+  </div>
+  <nav>
+    <div class="grp">Daily work</div>
+    {{ item(url_for('dashboard'), 'Dashboard', ['dashboard'], '&#9632;') }}
+    {{ item(url_for('billing'), 'Billing', ['billing'], '&#9998;') }}
+    {{ item(url_for('sales'), 'Bills', ['sales','sale_detail'], '&#9776;') }}
+    {{ item(url_for('receipts'), 'Receipts', ['receipts','receipt_detail'], '&#8377;') }}
+    {{ item(url_for('customers'), 'Customers', ['customers','customer_detail'], '&#9787;') }}
+
+    <div class="grp">Inventory</div>
+    {{ item(url_for('products'), 'Products', ['products','product_new','product_edit','categories'], '&#9641;') }}
+    {{ item(url_for('stock'), 'Stock', ['stock','stock_transfer','stock_history'], '&#9636;') }}
+    {% if current_user.role in ['admin','manager'] %}
+    {{ item(url_for('purchases'), 'Purchases', ['purchases','purchase_new','purchase_detail'], '&#8681;') }}
+    {{ item(url_for('suppliers'), 'Suppliers', ['suppliers'], '&#9951;') }}
+    {{ item(url_for('offers'), 'Offers', ['offers','offer_form'], '&#127991;') }}
+    {% endif %}
+
+    <div class="grp">Communication</div>
+    {% call item(url_for('notices'), 'Notices', ['notices','notice_new','notice_detail'], '&#9993;') %}{% if unread_notices %}<span class="badge">{{ unread_notices }}</span>{% endif %}{% endcall %}
+    {% if current_user.role in ['admin','manager'] %}
+    {% call item(url_for('messages'), 'Branch messages', ['messages','message_new','message_thread'], '&#8644;') %}{% if unread_messages %}<span class="badge">{{ unread_messages }}</span>{% endif %}{% endcall %}
+    {% endif %}
+
+    <div class="grp">Staff</div>
+    {% call item(url_for('leaves'), 'Leave', ['leaves','leave_new','leave_detail'], '&#9992;') %}{% if pending_leaves %}<span class="badge">{{ pending_leaves }}</span>{% endif %}{% endcall %}
+    {{ item(url_for('leaderboard'), 'Leaderboard', ['leaderboard'], '&#127942;') }}
+    {{ item(url_for('audit'), 'Login history' if current_user.role == 'cashier' else 'Login audit', ['audit'], '&#9201;') }}
+
+    {% if current_user.role in ['admin','manager'] or can_view_analytics %}
+    <div class="grp">Management</div>
+    {% endif %}
+    {% if can_view_analytics %}
+    {{ item(url_for('analytics'), 'Analytics', ['analytics'], '&#128200;') }}
+    {% endif %}
+    {% if current_user.role in ['admin','manager'] %}
+    {{ item(url_for('reports'), 'Reports', ['reports'], '&#9636;') }}
+    {% endif %}
+    {% if current_user.role == 'admin' %}
+    {{ item(url_for('settings_page'), 'Settings', ['settings_page','leave_policy'], '&#9881;') }}
+    {{ item(url_for('branches'), 'Branches & counters', ['branches'], '&#9783;') }}
+    {{ item(url_for('activity'), 'Activity log', ['activity'], '&#128269;') }}
+    {% endif %}
+    {% if can_manage_users %}
+    {{ item(url_for('users'), 'Users' if current_user.role == 'admin' else 'Cashier users', ['users'], '&#9823;') }}
+    {% endif %}
+    {% if can_reset_device %}
+    {{ item(url_for('devices'), 'Device locks', ['devices'], '&#128274;') }}
+    {% endif %}
+  </nav>
+  <div class="sidebar-foot">
+    <div class="user lbl"><strong>{{ current_user.full_name }}</strong><br><small>{{ current_user.role }}</small></div>
+    <a href="{{ url_for('change_password') }}" title="Change password">&#128273;</a>
+    <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline" title="Logout"><span class="lbl">Logout</span><span class="short">&#10162;</span></a>
+  </div>
+</aside>
+<div class="backdrop" id="backdrop" onclick="toggleSidebar()"></div>
+<header class="topbar">
+  <button class="menu-btn" type="button" onclick="toggleSidebar()" aria-label="Menu">&#9776;</button>
+  <span class="topbar-title">{{ self.title()|replace(' - ' ~ settings.shop_name, '') }}</span>
+  <div class="clock" id="clock" title="Current date and time"><span class="ico">&#128337;</span> <span id="clock-date"></span> <strong id="clock-time"></strong></div>
+  <div class="nav-right">
+    {% if current_user.role == 'admin' and all_branches and all_branches|length > 1 %}
+    <select class="branch-switch" onchange="location.href='/switch-branch/'+this.value">
+      {% for b in all_branches %}<option value="{{ b.id }}" {{ 'selected' if b.id==current_branch.id }}>{{ b.name }}</option>{% endfor %}
+    </select>
+    {% else %}
+    <span class="pill">{{ current_branch.name if current_branch }}</span>
+    {% endif %}
+    <a class="pill" href="{{ url_for('select_counter') }}" title="Change counter">{{ current_counter.code if current_counter else 'No counter' }}</a>
+    <a href="{{ url_for('billing') }}" class="btn btn-sm btn-accent">+ New Bill</a>
+  </div>
+</header>
+{% endif %}
+<main class="container {% block container_class %}{% endblock %}">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}<div class="flash flash-{{ cat }}">{{ msg }}</div>{% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+<script>
+(function () {
+  const d = document.getElementById('clock-date'), t = document.getElementById('clock-time');
+  if (!d) return;
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function tick() {
+    const n = new Date(), p = x => String(x).padStart(2, '0');
+    let h = n.getHours(), ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12;
+    d.textContent = days[n.getDay()] + ', ' + p(n.getDate()) + ' ' + months[n.getMonth()] + ' ' + n.getFullYear();
+    t.textContent = p(h) + ':' + p(n.getMinutes()) + ':' + p(n.getSeconds()) + ' ' + ap;
+  }
+  tick(); setInterval(tick, 1000);
+})();
+function toggleSidebar() {
+  if (window.innerWidth > 900) collapseSidebar(); else document.body.classList.toggle('nav-open');
+}
+function collapseSidebar() {
+  const on = document.documentElement.classList.toggle('nav-collapsed');
+  try { localStorage.setItem('rk_nav', on ? 'collapsed' : 'open'); } catch (e) {}
+}
+</script>
+{% block scripts %}{% endblock %}
+{% if current_user %}
+<div class="modal notice-modal" id="noticeModal"><div class="box">
+  <h2>&#128227; Notice for you</h2>
+  <div id="noticeList"></div>
+  <p class="hint">This popup will keep appearing until you mark each notice as read.</p>
+  <button type="button" class="btn btn-outline" onclick="noticeLater()">Remind me later</button>
+</div></div>
+<script>
+(function () {
+  const modal = document.getElementById('noticeModal'), list = document.getElementById('noticeList');
+  let shown = {{ popup_notices|map(attribute='id')|list|tojson }};
+  const esc = t => String(t || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  function render(items) {
+    list.innerHTML = items.map(n => `<div class="notice-item" id="ni${n.id}">
+      <div class="notice-title">${esc(n.title)}</div>
+      <div class="hint">From ${esc(n.sender)} &middot; ${esc(n.created_at)}</div>
+      ${n.body ? `<div class="notice-text">${esc(n.body)}</div>` : ''}
+      <button type="button" class="btn btn-sm" onclick="noticeRead(${n.id})">I have read this</button>
+      <a class="btn btn-sm btn-outline" href="/notices/${n.id}">Open</a></div>`).join('');
+    modal.classList.toggle('open', items.length > 0);
+    shown = items.map(n => n.id);
+  }
+  window.noticeRead = async function (id) {
+    const r = await (await fetch('/notices/' + id + '/read', { method: 'POST' })).json();
+    const el = document.getElementById('ni' + id); if (el) el.remove();
+    shown = shown.filter(x => x !== id);
+    if (!list.children.length) modal.classList.remove('open');
+    const badge = document.querySelector('a[href="/notices"] .badge');
+    if (badge) { if (r.unread) badge.textContent = r.unread; else badge.remove(); }
+  };
+  window.noticeLater = function () { modal.classList.remove('open'); };
+  {% if popup_notices %}
+  render([{% for n in popup_notices %}{id:{{ n.id }},title:{{ n.title|tojson }},body:{{ (n.body or '')|tojson }},created_at:{{ n.created_at|tojson }},sender:{{ n.sender|tojson }}}{{ ',' if not loop.last }}{% endfor %}]);
+  {% endif %}
+  setInterval(async () => {
+    try {
+      const items = await (await fetch('/api/notices/unread')).json();
+      const ids = items.map(n => n.id);
+      if (ids.some(id => !shown.includes(id))) render(items);   // something new arrived: pop up again
+    } catch (e) {}
+  }, 60000);
+})();
+</script>
+{% endif %}
+</body>
+</html>

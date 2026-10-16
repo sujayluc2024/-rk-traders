@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if p else 'Add' }} product{% endblock %}
+{% block content %}
+<div class="card" style="max-width:760px">
+  <h1>{{ 'Edit product' if p else 'Add product' }}</h1>
+  <form method="post">
+    <div class="field"><label>Product name *</label><input type="text" name="name" value="{{ p.name if p }}" required autofocus placeholder="e.g. Fortune Sunflower Oil 1L"></div>
+    <div class="row">
+      <div class="field"><label>Category</label>
+        <select name="category_id"><option value="">-- none --</option>
+          {% for c in categories %}<option value="{{ c.id }}" {{ 'selected' if p and p.category_id==c.id }}>{{ c.name }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Unit</label>
+        <select name="unit">{% for u in UNITS %}<option value="{{ u }}" {{ 'selected' if p and p.unit==u }}>{{ u }}</option>{% endfor %}</select></div>
+      <div class="field"><label>HSN code</label><input type="text" name="hsn" value="{{ p.hsn if p }}" placeholder="e.g. 1006"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>GST rate %</label>
+        <select name="gst_rate">{% for r in GST_RATES %}<option value="{{ r }}" {{ 'selected' if p and p.gst_rate==r }}>{{ r }}%</option>{% endfor %}</select></div>
+      <div class="field"><label>Purchase price (cost) &#8377;</label><input type="number" step="0.01" min="0" name="purchase_price" value="{{ p.purchase_price if p }}" required></div>
+      <div class="field"><label>Selling price &#8377; (GST included)</label><input type="number" step="0.01" min="0" name="selling_price" value="{{ p.selling_price if p }}" required></div>
+      <div class="field"><label>MRP &#8377;</label><input type="number" step="0.01" min="0" name="mrp" value="{{ p.mrp if p and p.mrp }}"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Low stock alert level</label><input type="number" step="0.001" min="0" name="low_stock_level" value="{{ p.low_stock_level if p else 5 }}"></div>
+      {% if not p %}
+      <div class="field"><label>Opening stock at {{ current_branch.name }}</label><input type="number" step="0.001" min="0" name="opening_stock" value="0"></div>
+      {% endif %}
+    </div>
+    <p class="hint">Selling price includes GST, the way MRP works. The bill will show the taxable value and GST split automatically.</p>
+    <p class="hint">Later, when you buy this item again at a different price, do not edit it here. Record it under <strong>Purchases &gt; New Purchase</strong>: the stock goes up and the cost and selling price update in the same step.</p>
+    <button class="btn">Save</button>
+    {% if not p %}<button class="btn btn-outline" name="add_another" value="1">Save &amp; add another</button>{% endif %}
+    <a href="{{ url_for('products') }}" class="btn btn-outline">Cancel</a>
+  </form>
+</div>
+{% endblock %}

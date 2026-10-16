@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}New notice{% endblock %}
+{% block content %}
+<div class="card" style="max-width:820px">
+  <h1>New notice</h1>
+  <form method="post">
+    <div class="field"><label>Title *</label><input type="text" name="title" required autofocus placeholder="e.g. Shop closed on Sunday for stock counting"></div>
+    <div class="field"><label>Notice</label><textarea name="body" rows="5"></textarea></div>
+
+    <h3>Send to</h3>
+    <div class="field">
+      {% if is_admin %}
+      <label class="checkbox"><input type="radio" name="scope" value="all" checked onchange="pick()"> All staff of all branches</label>
+      <label class="checkbox"><input type="radio" name="scope" value="branches" onchange="pick()"> Selected branches</label>
+      <label class="checkbox"><input type="radio" name="scope" value="users" onchange="pick()"> Selected staff members</label>
+      <label class="checkbox" id="mgr_wrap" style="margin-top:8px;padding-left:4px"><input type="checkbox" name="managers_only" id="managers_only"> Managers only (within the choice above)</label>
+      {% else %}
+      <label class="checkbox"><input type="radio" name="scope" value="all" checked onchange="pick()"> All staff of {{ current_branch.name }}</label>
+      <label class="checkbox"><input type="radio" name="scope" value="users" onchange="pick()"> Selected staff members</label>
+      {% endif %}
+    </div>
+
+    {% if is_admin %}
+    <div class="field" id="branch_box" style="display:none">
+      <label>Branches</label>
+      {% for b in branches_list %}<label class="checkbox"><input type="checkbox" name="branch_ids" value="{{ b.id }}"> {{ b.name }}</label>{% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="field" id="user_box" style="display:none">
+      <label>Staff members</label>
+      <div class="stafflist">
+        {% set ns = namespace(last=None) %}
+        {% for u in staff %}
+          {% if is_admin and u.branch_name != ns.last %}<div class="grp">{{ u.branch_name or 'Admins (no branch)' }}</div>{% set ns.last = u.branch_name %}{% endif %}
+          <label class="checkbox"><input type="checkbox" name="user_ids" value="{{ u.id }}"> {{ u.full_name }} <small class="hint">({{ u.role }})</small></label>
+        {% else %}<p class="hint">No other staff found. Add users under Settings &gt; Users.</p>{% endfor %}
+      </div>
+    </div>
+
+    <button class="btn">Send notice</button> <a href="{{ url_for('notices') }}" class="btn btn-outline">Cancel</a>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function pick() {
+  const v = document.querySelector('input[name=scope]:checked').value;
+  const bb = document.getElementById('branch_box'), ub = document.getElementById('user_box'), mw = document.getElementById('mgr_wrap');
+  if (bb) bb.style.display = v === 'branches' ? 'block' : 'none';
+  ub.style.display = v === 'users' ? 'block' : 'none';
+  if (mw) mw.style.display = v === 'users' ? 'none' : 'flex';
+}
+pick();
+</script>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% from '_export.html' import export_buttons %}
+{% block content %}
+<div class="toolbar">
+  <h1>Reports <small class="hint">{{ current_branch.name }}</small></h1>
+  <form method="get">
+    <select name="kind">{% for k, t in titles.items() %}<option value="{{ k }}" {{ 'selected' if k==kind }}>{{ t }}</option>{% endfor %}</select>
+    <input type="date" name="from" value="{{ date_from }}"> <span>to</span> <input type="date" name="to" value="{{ date_to }}">
+    <button class="btn btn-outline">Show</button>
+  </form>
+  {{ export_buttons('report_export', {'kind': kind, 'from': date_from, 'to': date_to}) }}
+</div>
+<div class="card table-wrap">
+  <h2>{{ titles[kind] }} <small class="hint">{{ date_from }} to {{ date_to }}</small></h2>
+  <table>
+    {% if rows %}
+    <tr>{% for k in rows[0].keys() %}<th class="{{ 'num' if rows[0][k] is number }}">{{ k.replace('_',' ')|title }}</th>{% endfor %}</tr>
+    {% set totals = {} %}
+    {% for r in rows %}
+    <tr>{% for k in r.keys() %}
+      {% set v = r[k] %}
+      {% if v is number and k not in ['gst_rate','date'] %}
+        {% if totals.update({k: totals.get(k, 0) + v}) %}{% endif %}
+        <td class="num">{{ v|qty if k in ['bills','qty'] else v|inr }}</td>
+      {% elif v is number %}<td class="num">{{ v|qty }}{{ '%' if k=='gst_rate' }}</td>
+      {% else %}<td>{{ v if v is not none else '-' }}</td>{% endif %}
+    {% endfor %}</tr>
+    {% endfor %}
+    <tr>{% for k in rows[0].keys() %}<th class="num">{% if k in totals %}{{ totals[k]|qty if k in ['bills','qty'] else totals[k]|inr }}{% elif loop.first %}Total{% endif %}</th>{% endfor %}</tr>
+    {% else %}<tr><td class="empty">No data for this period.</td></tr>{% endif %}
+  </table>
+</div>
+{% if kind == 'items' %}<p class="hint">Profit = sale amount (GST inclusive) minus purchase price at the time of sale. It is an estimate for guidance, not an accounting figure.</p>{% endif %}
+{% if kind == 'branches' %}<p class="hint">This report covers all branches regardless of the branch selected in the top bar.</p>{% endif %}
+{% endblock %}

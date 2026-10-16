@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Offers{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>Offers</h1><a href="{{ url_for('offer_form') }}" class="btn btn-accent">+ New offer</a></div>
+<div class="card table-wrap"><table>
+  <tr><th>Offer</th><th>Type</th><th>Applies to</th><th>Valid</th><th>Branch</th><th>Status</th><th>Created by</th><th></th></tr>
+  {% for o in offers %}
+  {% set live = o.active and o.from_date <= today and o.to_date >= today %}
+  <tr>
+    <td><strong>{{ o.name }}</strong></td>
+    <td>{{ OFFER_TYPES[o.type] }}</td>
+    <td>{% if o.type == 'product_pct' %}{{ o.product_name }}: {{ o.value|qty }}% off
+        {% elif o.type == 'product_price' %}{{ o.product_name }} at {{ o.value|inr }}
+        {% elif o.type == 'buy_x_get_y' %}{{ o.product_name }}: buy {{ o.buy_qty|qty }} get {{ o.free_qty|qty }} free
+        {% elif o.type == 'category_pct' %}{{ o.category_name }}: {{ o.value|qty }}% off
+        {% elif o.type == 'bill_pct' %}{{ o.value|qty }}% off bills of {{ o.min_bill|inr }} or more
+        {% else %}{{ o.value|inr }} off bills of {{ o.min_bill|inr }} or more{% endif %}</td>
+    <td>{{ o.from_date }} to {{ o.to_date }}</td>
+    <td>{{ o.branch_name or 'All branches' }}</td>
+    <td>{% if live %}<span class="tag cash">Live</span>{% elif not o.active %}<span class="tag">Off</span>{% elif o.to_date < today %}<span class="tag">Expired</span>{% else %}<span class="tag upi">Upcoming</span>{% endif %}</td>
+    <td>{{ o.creator or '-' }}</td>
+    <td style="white-space:nowrap">
+      {% if current_user.role == 'admin' or o.branch_id == current_user.branch_id %}
+      <a href="{{ url_for('offer_form', oid=o.id) }}" class="btn btn-sm btn-outline">Edit</a>
+      <form method="post" action="{{ url_for('offer_toggle', oid=o.id) }}" style="display:inline"><button class="btn btn-sm btn-outline">{{ 'Switch off' if o.active else 'Switch on' }}</button></form>
+      <form method="post" action="{{ url_for('offer_delete', oid=o.id) }}" style="display:inline" onsubmit="return confirm('Delete offer {{ o.name }}?')"><button class="btn btn-sm btn-danger">Delete</button></form>
+      {% else %}<span class="hint">admin offer</span>{% endif %}
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="8" class="empty">No offers yet. Click New offer to create one.</td></tr>{% endfor %}
+</table></div>
+<p class="hint">Live offers apply automatically on the billing screen. When several offers match one item, the customer gets the best one. A bill offer applies on top, after item offers.</p>
+{% endblock %}
