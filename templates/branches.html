@@ -6,9 +6,9 @@
   <div>
     <div class="card table-wrap">
       <h2>Branches</h2>
-      <table><tr><th>Code</th><th>Name</th><th>Address</th><th>GSTIN</th><th class="num">Counters</th><th></th></tr>
+      <table><tr><th>Code</th><th>Name</th><th>Address</th><th>GSTIN</th><th>Bill format</th><th class="num">Counters</th><th></th></tr>
       {% for b in branches %}
-      <tr><td><strong>{{ b.code }}</strong></td><td>{{ b.name }}{% if not b.active %} <span class="tag">inactive</span>{% endif %}</td><td>{{ b.address or '-' }}</td><td>{{ b.gstin or '-' }}</td><td class="num">{{ b.n_counters }}</td>
+      <tr><td><strong>{{ b.code }}</strong></td><td>{{ b.name }}{% if not b.active %} <span class="tag">inactive</span>{% endif %}</td><td>{{ b.address or '-' }}</td><td>{{ b.gstin or '-' }}</td><td>{{ {'a4':'A4','t80':'Thermal 80 mm','t58':'Thermal 58 mm'}.get(b.print_format, 'Company default') }}</td><td class="num">{{ b.n_counters }}</td>
           <td><button class="btn btn-sm btn-outline" onclick='editBranch({{ dict(b)|tojson }})'>Edit</button></td></tr>
       {% endfor %}</table>
     </div>
@@ -35,6 +35,13 @@
           <div class="field"><label>Phone</label><input type="text" name="phone" id="b_phone"></div>
           <div class="field"><label>GSTIN (if different)</label><input type="text" name="gstin" id="b_gstin"></div>
         </div>
+        <div class="field"><label>Bill format for this branch's printer</label>
+          <select name="print_format" id="b_print_format">
+            <option value="">Use company default (Settings &gt; Bill printing)</option>
+            <option value="a4">A4 page (normal printer)</option>
+            <option value="t80">Thermal receipt 80 mm</option>
+            <option value="t58">Thermal receipt 58 mm</option>
+          </select></div>
         <div class="field" id="b_active_wrap" style="display:none"><label class="checkbox"><input type="checkbox" name="active" id="b_active" checked> Active</label></div>
         <button class="btn">Save branch</button> <button type="button" class="btn btn-outline" onclick="editBranch()">Clear</button>
       </form>
@@ -88,6 +95,7 @@ function editBranch(b) {
   b = b || {};
   document.getElementById('btitle').textContent = b.id ? 'Edit branch ' + b.code : 'Add branch';
   for (const k of ['id','code','name','address','phone','gstin']) document.getElementById('b_'+k).value = b[k] || '';
+  document.getElementById('b_print_format').value = b.print_format || '';
   document.getElementById('b_active').checked = b.id ? !!b.active : true;
   document.getElementById('b_active_wrap').style.display = b.id ? 'block' : 'none';
 }

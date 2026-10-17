@@ -69,7 +69,8 @@ def migrate(db):
     wanted = {
         "sales": [("prev_balance", "REAL NOT NULL DEFAULT 0"), ("credit_paid", "REAL NOT NULL DEFAULT 0")],
         "payments": [("receipt_no", "TEXT"), ("prev_balance", "REAL NOT NULL DEFAULT 0"), ("new_balance", "REAL NOT NULL DEFAULT 0")],
-        "branches": [("next_receipt_seq", "INTEGER NOT NULL DEFAULT 1"), ("signature_file", "TEXT"), ("signatory_name", "TEXT")],
+        "branches": [("next_receipt_seq", "INTEGER NOT NULL DEFAULT 1"), ("signature_file", "TEXT"), ("signatory_name", "TEXT"),
+                     ("print_format", "TEXT")],
         "sales_extra": [],
     }
     wanted["sales"].append(("login_session_id", "INTEGER"))
@@ -1201,7 +1202,8 @@ def sale_detail(sid):
     receipts_applied = q("SELECT a.amount, p.id AS payment_id, p.receipt_no, p.date, p.mode FROM payment_allocations a "
                          "JOIN payments p ON p.id=a.payment_id WHERE a.sale_id=? ORDER BY p.id", (sid,))
     sig_path, sig_name, sig_src = signature_for(s["branch_id"])
-    fmt = request.args.get("fmt") or get_setting("print_format", "a4")
+    bfmt = q("SELECT print_format FROM branches WHERE id=?", (s["branch_id"],), one=True)
+    fmt = request.args.get("fmt") or (bfmt["print_format"] if bfmt and bfmt["print_format"] else None) or get_setting("print_format", "a4")
     if fmt in ("t80", "t58"):
         return render_template("invoice_thermal.html", s=s, items=items, tax_summary=tax_summary, fmt=fmt,
                                autoprint=request.args.get("print") == "1")
@@ -1650,13 +1652,14 @@ def branches():
     if request.method == "POST":
         f = request.form
         try:
+            pf = f.get("print_format") if f.get("print_format") in ("a4", "t80", "t58") else None
             if f.get("id"):
-                run("UPDATE branches SET code=?,name=?,address=?,phone=?,gstin=?,active=? WHERE id=?",
+                run("UPDATE branches SET code=?,name=?,address=?,phone=?,gstin=?,active=?,print_format=? WHERE id=?",
                     (f["code"].strip().upper(), f["name"].strip(), f.get("address", ""), f.get("phone", ""), f.get("gstin", ""),
-                     1 if f.get("active") else 0, f["id"]))
+                     1 if f.get("active") else 0, pf, f["id"]))
             else:
-                bid = run("INSERT INTO branches(code,name,address,phone,gstin) VALUES (?,?,?,?,?)",
-                          (f["code"].strip().upper(), f["name"].strip(), f.get("address", ""), f.get("phone", ""), f.get("gstin", "")))
+                bid = run("INSERT INTO branches(code,name,address,phone,gstin,print_format) VALUES (?,?,?,?,?,?)",
+                          (f["code"].strip().upper(), f["name"].strip(), f.get("address", ""), f.get("phone", ""), f.get("gstin", ""), pf))
                 run("INSERT INTO counters(branch_id,code,name) VALUES (?,'C1','Counter 1')", (bid,))
             get_db().commit()
         except sqlite3.IntegrityError:

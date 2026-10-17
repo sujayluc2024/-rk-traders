@@ -28,7 +28,7 @@
     </div>
     <div class="field"><label>Designations (comma separated)</label><input type="text" name="designations" value="{{ settings.designations }}"></div>
     <h2 style="margin-top:18px">Bill printing</h2>
-    <div class="field"><label>Default bill format when a bill is saved</label>
+    <div class="field"><label>Default bill format when a bill is saved <span class="hint">(a branch can override this under Branches &amp; counters)</span></label>
       <select name="print_format">
         <option value="a4" {{ 'selected' if settings.print_format=='a4' }}>A4 page (normal printer)</option>
         <option value="t80" {{ 'selected' if settings.print_format=='t80' }}>Thermal receipt 80 mm</option>
