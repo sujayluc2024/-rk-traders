@@ -17,7 +17,7 @@
     <td><a href="{{ url_for('sale_detail', sid=s.id) }}"><strong>{{ s.invoice_no }}</strong></a></td><td>{{ s.created_at }}</td><td>{{ s.counter }}</td>
     <td>{{ s.customer or 'Walk-in' }}</td><td>{{ s.user or '-' }}</td><td><span class="tag {{ s.payment_mode|lower }}">{{ s.payment_mode }}</span></td>
     <td class="num">{{ s.grand_total|inr }}</td><td class="num">{{ s.credit_amount|inr if s.credit_amount else '-' }}</td>
-    <td style="white-space:nowrap"><a href="{{ url_for('sale_detail', sid=s.id, print=1) }}" target="_blank" class="btn btn-sm btn-outline">Print</a>
+    <td style="white-space:nowrap"><a href="{{ url_for('sale_detail', sid=s.id, print=1) }}" target="_blank" class="btn btn-sm btn-outline" title="Default format">Print</a> <a href="{{ url_for('sale_detail', sid=s.id, fmt='t80', print=1) }}" target="_blank" class="btn btn-sm btn-outline" title="Thermal 80 mm">80</a> <a href="{{ url_for('sale_detail', sid=s.id, fmt='a4', print=1) }}" target="_blank" class="btn btn-sm btn-outline" title="A4">A4</a>
       {% if current_user.role == 'admin' %}<form method="post" action="{{ url_for('sale_delete', sid=s.id) }}" style="display:inline" onsubmit="return confirm('Cancel bill {{ s.invoice_no }}? Stock will be restored.')"><button class="btn btn-sm btn-danger">Cancel</button></form>{% endif %}</td>
   </tr>
   {% else %}<tr><td colspan="9" class="empty">No bills in this period.</td></tr>{% endfor %}

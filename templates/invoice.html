@@ -42,7 +42,9 @@
 </head>
 <body>
 <div class="actions">
-  <button onclick="window.print()">Print</button>
+  <button onclick="window.print()">Print A4</button>
+  <a class="alt" href="{{ url_for('sale_detail', sid=s.id, fmt='t80', print=1) }}">Thermal 80 mm</a>
+  <a class="alt" href="{{ url_for('sale_detail', sid=s.id, fmt='t58', print=1) }}">Thermal 58 mm</a>
   <a class="alt" href="{{ url_for('billing') }}">New bill</a>
   <a class="alt" href="{{ url_for('sales') }}">All bills</a>
 </div>

@@ -26,7 +26,8 @@ other PC open http://192.168.1.5:5000 in the browser.
 
 ## Daily use
 
-- **Billing**: type the product name, press Enter, type the quantity, press Enter to go back to search. Press F9 to save and print. The invoice opens in a new tab and the print dialog appears. Prints on A4.
+- **Billing**: type the product name, press Enter, type the quantity, press Enter to go back to search. Press F9 to save and print. The bill opens in a new tab and the print dialog appears.
+- **Bill formats**: A4 page, thermal 80 mm, or thermal 58 mm. Set the default under Settings > Bill printing; every bill page also has buttons for the other formats. For a thermal printer: install its Windows driver, set the paper width in the driver, then in the browser print dialog pick the thermal printer, set Margins to None and Scale to 100%, and untick headers and footers. Tick "Remember" in the dialog, or set the thermal printer as the Windows default, so the next prints go straight through.
 - **Credit (udhaar)**: choose Credit as the payment mode, pick or add a customer, enter the amount paid now. The rest is added to the customer's balance. The bill prints the previous balance, this bill's credit, and the total due.
 - **Collecting udhaar**: open Customers > customer name. Enter the amount, mode, and optionally which invoice it is for (default is oldest first). Click Save & print receipt. A numbered receipt voucher (for example MB/RCPT/2627/00007) prints with the invoices it settled and the balance still due. The customer page shows unpaid invoices and a full statement with invoice and receipt numbers. The Receipts menu lists all receipts for the branch.
 - **Mistakes**: an admin can cancel a receipt from the Receipts page, which makes the amount due again. A bill that already has a receipt applied cannot be cancelled until that receipt is cancelled first.

@@ -27,6 +27,14 @@
       <div class="field"><label>ID card validity (years)</label><input type="number" min="1" max="10" name="id_card_validity_years" value="{{ settings.id_card_validity_years }}"></div>
     </div>
     <div class="field"><label>Designations (comma separated)</label><input type="text" name="designations" value="{{ settings.designations }}"></div>
+    <h2 style="margin-top:18px">Bill printing</h2>
+    <div class="field"><label>Default bill format when a bill is saved</label>
+      <select name="print_format">
+        <option value="a4" {{ 'selected' if settings.print_format=='a4' }}>A4 page (normal printer)</option>
+        <option value="t80" {{ 'selected' if settings.print_format=='t80' }}>Thermal receipt 80 mm</option>
+        <option value="t58" {{ 'selected' if settings.print_format=='t58' }}>Thermal receipt 58 mm</option>
+      </select></div>
+    <p class="hint">Any bill can still be printed in another format from the buttons on the bill page. For a thermal printer, install its Windows driver, set its paper width in the driver, and in the browser print dialog choose the thermal printer with margins set to None and scale 100%.</p>
     <h2 style="margin-top:18px">Login page background</h2>
     <div class="row">
       <div class="field">{% if settings.login_bg_file %}<img src="{{ url_for('login_bg_image') }}?v={{ settings.login_bg_file }}" alt="login background" style="max-height:110px;max-width:100%;border-radius:8px;border:1px solid var(--border)"><br>

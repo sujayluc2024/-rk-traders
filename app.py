@@ -121,6 +121,7 @@ def init_db():
         "signature_file": "",
         "signatory_name": "",
         "login_bg_file": "",
+        "print_format": "a4",
         "offer_letter_template": (
             "Dear {name},\n\n"
             "We are pleased to offer you the position of {designation} at {company}, {branch}, with effect from {joining_date}.\n\n"
@@ -1196,6 +1197,10 @@ def sale_detail(sid):
     receipts_applied = q("SELECT a.amount, p.id AS payment_id, p.receipt_no, p.date, p.mode FROM payment_allocations a "
                          "JOIN payments p ON p.id=a.payment_id WHERE a.sale_id=? ORDER BY p.id", (sid,))
     sig_path, sig_name, sig_src = signature_for(s["branch_id"])
+    fmt = request.args.get("fmt") or get_setting("print_format", "a4")
+    if fmt in ("t80", "t58"):
+        return render_template("invoice_thermal.html", s=s, items=items, tax_summary=tax_summary, fmt=fmt,
+                               autoprint=request.args.get("print") == "1")
     return render_template("invoice.html", s=s, items=items, tax_summary=tax_summary, receipts_applied=receipts_applied,
                            autoprint=request.args.get("print") == "1",
                            sig_url=(url_for("branch_signature", bid=s["branch_id"]) if sig_path else None), sig_name=sig_name)
@@ -1490,7 +1495,7 @@ def settings_page():
         if request.form.get("remove_login_bg"):
             run("UPDATE settings SET value='' WHERE key='login_bg_file'")
         for k in ["shop_name", "shop_tagline", "shop_address", "shop_phone", "shop_gstin", "state_name", "state_code", "invoice_footer",
-                  "offer_letter_template", "emp_id_prefix", "designations", "id_card_validity_years", "signatory_name"]:
+                  "offer_letter_template", "emp_id_prefix", "designations", "id_card_validity_years", "signatory_name", "print_format"]:
             run("INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (k, request.form.get(k, "").strip()))
         run("INSERT INTO settings(key,value) VALUES ('allow_negative_stock',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
