@@ -239,3 +239,10 @@ table.activity tr.failed td { background: #fff1f2; }
 .sidebar .brand { display: flex; align-items: center; }
 .nav-collapsed .brand-logo { margin-right: 0; }
 .login-logo { display: block; width: 100%; max-width: 300px; margin: 0 auto 22px; }
+
+/* ---------------- Signature styles ---------------- */
+.sig-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin: 6px 0 14px; }
+.sig-opt { border: 1px solid var(--border); border-radius: 8px; padding: 8px; cursor: pointer; text-align: center; background: #fff; font-weight: normal; color: var(--muted); font-size: 12px; }
+.sig-opt input { display: none; }
+.sig-opt img { display: block; width: 100%; height: 64px; object-fit: contain; margin-bottom: 4px; }
+.sig-opt:has(input:checked) { border-color: var(--primary); background: #e6f4f1; box-shadow: 0 0 0 2px rgba(15,118,110,.25); }

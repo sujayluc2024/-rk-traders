@@ -33,12 +33,48 @@
         <label class="checkbox" style="margin-top:6px"><input type="checkbox" name="remove_signature" value="1"> Remove signature</label>{% else %}<span class="hint">No signature uploaded yet.</span>{% endif %}</div>
       <div class="field"><label>Upload signature image (PNG with transparent background works best, or JPG)</label><input type="file" name="signature" accept=".png,.jpg,.jpeg"></div>
     </div>
-    <p class="hint">The signature prints above "Authorised Signatory" on invoices, receipts, offer letters, salary slips, and ID cards.</p>
+    <div class="field"><label>Authorised person's name (printed under the signature)</label><input type="text" name="signatory_name" value="{{ settings.signatory_name }}" placeholder="e.g. R. K. Mandal, Proprietor"></div>
+    <p class="hint">The signature prints above "Authorised Signatory" on invoices, receipts, offer letters, salary slips, and ID cards. Upload a scanned signature above, or create a digital one below.</p>
+    <button class="btn">Save settings</button>
+  </form>
+</div>
+
+<div class="card" style="max-width:720px">
+  <h2>Create a digital signature from a typed name</h2>
+  <form method="post" action="{{ url_for('signature_generate') }}" id="sigform">
+    <div class="row">
+      <div class="field" style="flex:2"><label>Name to sign as</label><input type="text" name="name" id="sig_name" value="{{ settings.signatory_name }}" maxlength="40" placeholder="e.g. R. K. Mandal" required></div>
+      <div class="field"><label>Ink</label><select name="ink" id="sig_ink">{% for i in sig_inks %}<option value="{{ i }}">{{ i|title }}</option>{% endfor %}</select></div>
+    </div>
+    <label>Style (click one)</label>
+    <div class="sig-grid">
+      {% for key, (label, path) in sig_fonts.items() %}
+      <label class="sig-opt"><input type="radio" name="font" value="{{ key }}" {{ 'checked' if loop.first }}><img data-font="{{ key }}" alt="{{ label }}"><span>{{ label }}</span></label>
+      {% endfor %}
+    </div>
+    <button class="btn btn-accent" type="submit">Create and use this signature</button>
+    <p class="hint">This replaces the current signature. The name is also saved as the authorised person's name.</p>
+  </form>
+</div>
+<div style="display:none">
     <h2 id="offer" style="margin-top:18px">Offer letter template</h2>
     <div class="field"><textarea name="offer_letter_template" rows="12">{{ settings.offer_letter_template }}</textarea></div>
     <p class="hint">Placeholders filled automatically: {name}, {designation}, {branch}, {joining_date}, {salary}, {salary_words}, {company}, {date}. Leave a blank line between paragraphs.</p>
     <p class="hint">A branch can have its own address and GSTIN under Branches. If a branch has a GSTIN, it is printed instead of the one here. With a GSTIN the bill says TAX INVOICE, otherwise CASH MEMO.</p>
-    <button class="btn">Save settings</button>
-  </form>
-</div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const name = document.getElementById('sig_name'), ink = document.getElementById('sig_ink');
+  let timer;
+  function refresh() {
+    const n = encodeURIComponent(name.value || 'Signature'), i = encodeURIComponent(ink.value);
+    document.querySelectorAll('.sig-grid img').forEach(img => { img.src = '/signature/preview?name=' + n + '&ink=' + i + '&font=' + img.dataset.font; });
+  }
+  name.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(refresh, 300); });
+  ink.addEventListener('change', refresh);
+  refresh();
+})();
+</script>
 {% endblock %}

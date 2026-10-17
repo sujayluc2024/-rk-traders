@@ -119,6 +119,7 @@ def init_db():
         "designations": "Cashier, Senior Cashier, Store Helper, Delivery Staff, Supervisor, Store Manager, Branch Manager, Accountant",
         "id_card_validity_years": "2",
         "signature_file": "",
+        "signatory_name": "",
         "offer_letter_template": (
             "Dear {name},\n\n"
             "We are pleased to offer you the position of {designation} at {company}, {branch}, with effect from {joining_date}.\n\n"
@@ -1467,7 +1468,7 @@ def settings_page():
         if request.form.get("remove_signature"):
             run("UPDATE settings SET value='' WHERE key='signature_file'")
         for k in ["shop_name", "shop_tagline", "shop_address", "shop_phone", "shop_gstin", "state_name", "state_code", "invoice_footer",
-                  "offer_letter_template", "emp_id_prefix", "designations", "id_card_validity_years"]:
+                  "offer_letter_template", "emp_id_prefix", "designations", "id_card_validity_years", "signatory_name"]:
             run("INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (k, request.form.get(k, "").strip()))
         run("INSERT INTO settings(key,value) VALUES ('allow_negative_stock',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
@@ -1475,7 +1476,76 @@ def settings_page():
         get_db().commit()
         flash("Settings saved.", "success")
         return redirect(url_for("settings_page"))
-    return render_template("settings.html")
+    return render_template("settings.html", sig_fonts=available_signature_fonts(), sig_inks=list(SIGNATURE_INKS))
+
+
+SIGNATURE_FONTS = {                     # key: (label, Windows font file)
+    "segoesc": ("Segoe Script", "segoesc.ttf"), "brush": ("Brush Script", "BRUSHSCI.TTF"), "freestyle": ("Freestyle Script", "FREESCPT.TTF"),
+    "mistral": ("Mistral", "MISTRAL.TTF"), "corsiva": ("Monotype Corsiva", "MTCORSVA.TTF"), "pristina": ("Pristina", "PRISTINA.TTF"),
+    "vivaldi": ("Vivaldi", "VIVALDII.TTF"), "lucida": ("Lucida Handwriting", "LHANDW.TTF"), "bradley": ("Bradley Hand", "BRADHITC.TTF"),
+    "inkfree": ("Ink Free", "Inkfree.ttf"),
+}
+SIGNATURE_INKS = {"black": (20, 20, 20), "blue": (23, 37, 110), "navy": (12, 50, 90)}
+
+
+def available_signature_fonts():
+    out = {}
+    for k, (label, f) in SIGNATURE_FONTS.items():
+        path = os.path.join(r"C:\Windows\Fonts", f)
+        if os.path.exists(path):
+            out[k] = (label, path)
+    return out
+
+
+def render_signature(name, font_key="segoesc", ink="blue"):
+    """Draw the typed name as a signature: transparent PNG with a light underline flourish."""
+    from PIL import Image, ImageDraw, ImageFont
+    fonts = available_signature_fonts()
+    label, path = fonts.get(font_key) or next(iter(fonts.values()))
+    size = 120
+    font = ImageFont.truetype(path, size)
+    name = name.strip() or "Signature"
+    tmp = Image.new("RGBA", (10, 10))
+    l, t, r, b = ImageDraw.Draw(tmp).textbbox((0, 0), name, font=font)
+    w, h = r - l, b - t
+    pad = 40
+    img = Image.new("RGBA", (w + pad * 2, h + pad * 2 + 30), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    colour = SIGNATURE_INKS.get(ink, SIGNATURE_INKS["blue"]) + (255,)
+    d.text((pad - l, pad - t), name, font=font, fill=colour)
+    # flourish: a gentle curved underline
+    y = pad + h + 14
+    d.line([(pad + 8, y + 6), (pad + w * 0.35, y - 2), (pad + w * 0.7, y + 8), (pad + w + 4, y)], fill=colour, width=4, joint="curve")
+    # slight slant to look hand written
+    img = img.transform(img.size, Image.AFFINE, (1, 0.18, -0.18 * img.size[1] / 2, 0, 1, 0), resample=Image.BICUBIC)
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    return buf.getvalue()
+
+
+@app.route("/signature/preview")
+@role_required("admin")
+def signature_preview():
+    png = render_signature(request.args.get("name", "Signature")[:40], request.args.get("font", "segoesc"), request.args.get("ink", "blue"))
+    return send_file(io.BytesIO(png), mimetype="image/png")
+
+
+@app.route("/settings/signature/generate", methods=["POST"])
+@role_required("admin")
+def signature_generate():
+    name = request.form.get("name", "").strip()[:40]
+    if not name:
+        flash("Type the authorised person's name first.", "error")
+        return redirect(url_for("settings_page"))
+    png = render_signature(name, request.form.get("font", "segoesc"), request.form.get("ink", "blue"))
+    os.makedirs(os.path.join(BASE_DIR, "uploads"), exist_ok=True)
+    with open(os.path.join(BASE_DIR, "uploads", "signature.png"), "wb") as fh:
+        fh.write(png)
+    run("INSERT INTO settings(key,value) VALUES ('signature_file','signature.png') ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+    run("INSERT INTO settings(key,value) VALUES ('signatory_name',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (name,))
+    get_db().commit()
+    flash(f"Digital signature created for {name}. It now prints on all documents.", "success")
+    return redirect(url_for("settings_page"))
 
 
 @app.route("/signature")
@@ -2347,14 +2417,14 @@ ACTION_LABELS = {
     "leave_new": "Applied for leave", "leave_decide": "Decided leave", "leave_cancel": "Withdrew leave",
     "leave_document": "Leave document", "award_give": "Gave award", "award_delete": "Removed award",
     "user_reset_device": "Reset device lock", "offer_form": "Saved offer",
-    "purchase_bill": "Supplier bill", "hr_staff": "Saved staff profile", "hr_offer_letter": "Generated offer letter", "hr_id_card": "Generated ID card",
+    "purchase_bill": "Supplier bill", "signature_generate": "Created digital signature", "hr_staff": "Saved staff profile", "hr_offer_letter": "Generated offer letter", "hr_id_card": "Generated ID card",
     "hr_salary_slip": "Generated salary slip", "document_view": "Viewed staff document", "document_delete": "Deleted staff document",
     "document_signed": "Signed offer letter copy", "offer_toggle": "Switched offer on/off", "offer_delete": "Deleted offer",
     "report_export": "Exported report", "audit_export": "Exported login audit", "activity_export": "Exported activity log",
     "sales_export": "Exported bills register", "receipts_export": "Exported receipts", "stock_export": "Exported stock list",
     "customers_export": "Exported customer list",
 }
-SKIP_ENDPOINTS = {"static", "api_product_search", "api_customer_search", "api_notices_unread", "api_branch_stock", "notice_mark_read"}
+SKIP_ENDPOINTS = {"static", "api_product_search", "api_customer_search", "api_notices_unread", "api_branch_stock", "notice_mark_read", "signature_preview"}
 LOGGED_GETS = {"logout", "switch_branch", "report_export", "audit_export", "activity_export", "sales_export", "receipts_export",
                "stock_export", "customers_export", "document_view", "purchase_bill", "document_signed"}
 SECRET_KEYS = ("password", "old", "new", "confirm")
@@ -2807,7 +2877,7 @@ def build_offer_letter(user, prof):
             story.append(Spacer(1, 30))
     else:
         story.append(Spacer(1, 30))
-    story.append(Paragraph("______________________<br/>Authorised Signatory", normal))
+    story.append(Paragraph("______________________<br/>Authorised Signatory" + (("<br/>" + st["signatory_name"]) if st.get("signatory_name") else ""), normal))
     story.append(Spacer(1, 30))
     story.append(Paragraph("I accept the above offer.<br/><br/><br/>______________________<br/>" + fields["name"] + " &nbsp;&nbsp; Date: ___________", normal))
     doc.build(story)
@@ -3020,7 +3090,8 @@ def build_salary_slip(user, prof, ym, fig):
             sig_cell = RLImage(sig, width=36 * mm, height=14 * mm, kind="proportional", hAlign="RIGHT")
         except Exception:
             sig_cell = ""
-    story.append(Table([["", sig_cell], [Paragraph("Employee signature", n), Paragraph("Authorised signatory", ParagraphStyle("r", parent=n, alignment=2))]],
+    sname = all_settings().get("signatory_name", "")
+    story.append(Table([["", sig_cell], [Paragraph("Employee signature", n), Paragraph("Authorised signatory" + (f"<br/>{sname}" if sname else ""), ParagraphStyle("r", parent=n, alignment=2))]],
                        colWidths=[89 * mm, 89 * mm], rowHeights=[16 * mm, None]))
     story.append(Spacer(1, 6))
     story.append(Paragraph(f"Generated on {datetime.now().strftime('%d-%m-%Y %I:%M %p')}. This is a computer generated slip.",
