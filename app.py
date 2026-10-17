@@ -69,7 +69,7 @@ def migrate(db):
     wanted = {
         "sales": [("prev_balance", "REAL NOT NULL DEFAULT 0"), ("credit_paid", "REAL NOT NULL DEFAULT 0")],
         "payments": [("receipt_no", "TEXT"), ("prev_balance", "REAL NOT NULL DEFAULT 0"), ("new_balance", "REAL NOT NULL DEFAULT 0")],
-        "branches": [("next_receipt_seq", "INTEGER NOT NULL DEFAULT 1")],
+        "branches": [("next_receipt_seq", "INTEGER NOT NULL DEFAULT 1"), ("signature_file", "TEXT"), ("signatory_name", "TEXT")],
         "sales_extra": [],
     }
     wanted["sales"].append(("login_session_id", "INTEGER"))
@@ -736,7 +736,9 @@ def receipt_detail(rid):
     allocs = q("SELECT a.amount, s.id AS sale_id, s.invoice_no, s.date, s.grand_total, s.credit_amount, s.credit_paid, "
                "s.credit_amount-s.credit_paid AS still_due FROM payment_allocations a JOIN sales s ON s.id=a.sale_id "
                "WHERE a.payment_id=? ORDER BY s.id", (rid,))
-    return render_template("receipt.html", p=p, allocs=allocs, autoprint=request.args.get("print") == "1")
+    sig_path, sig_name, sig_src = signature_for(p["branch_id"])
+    return render_template("receipt.html", p=p, allocs=allocs, autoprint=request.args.get("print") == "1",
+                           sig_url=(url_for("branch_signature", bid=p["branch_id"] or 0) if sig_path else None), sig_name=sig_name)
 
 
 @app.route("/receipts/<int:rid>/delete", methods=["POST"])
@@ -1192,8 +1194,10 @@ def sale_detail(sid):
                     "GROUP BY gst_rate ORDER BY gst_rate", (sid,))
     receipts_applied = q("SELECT a.amount, p.id AS payment_id, p.receipt_no, p.date, p.mode FROM payment_allocations a "
                          "JOIN payments p ON p.id=a.payment_id WHERE a.sale_id=? ORDER BY p.id", (sid,))
+    sig_path, sig_name, sig_src = signature_for(s["branch_id"])
     return render_template("invoice.html", s=s, items=items, tax_summary=tax_summary, receipts_applied=receipts_applied,
-                           autoprint=request.args.get("print") == "1")
+                           autoprint=request.args.get("print") == "1",
+                           sig_url=(url_for("branch_signature", bid=s["branch_id"]) if sig_path else None), sig_name=sig_name)
 
 
 @app.route("/sales/<int:sid>/delete", methods=["POST"])
@@ -1557,6 +1561,52 @@ def signature_image():
     return send_from_directory(os.path.dirname(path), os.path.basename(path))
 
 
+@app.route("/branches/<int:bid>/signature")
+@login_required
+def branch_signature(bid):
+    path, _, _ = signature_for(bid)
+    if not path:
+        abort(404)
+    return send_from_directory(os.path.dirname(path), os.path.basename(path))
+
+
+@app.route("/branches/<int:bid>/signature", methods=["POST"])
+@role_required("admin")
+def branch_signature_save(bid):
+    b = q("SELECT * FROM branches WHERE id=?", (bid,), one=True) or abort(404)
+    f = request.form
+    if f.get("remove"):
+        if b["signature_file"]:
+            try:
+                os.remove(os.path.join(BASE_DIR, "uploads", b["signature_file"]))
+            except OSError:
+                pass
+        run("UPDATE branches SET signature_file=NULL, signatory_name=NULL WHERE id=?", (bid,))
+        get_db().commit()
+        flash(f"{b['name']} will now use the company signature.", "success")
+        return redirect(url_for("branches"))
+    os.makedirs(os.path.join(BASE_DIR, "uploads"), exist_ok=True)
+    file = request.files.get("signature")
+    if file and file.filename:
+        ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+        if ext not in ("png", "jpg", "jpeg"):
+            flash("Signature must be a PNG or JPG image.", "error")
+            return redirect(url_for("branches"))
+        fname = f"signature_branch{bid}.{ext}"
+        file.save(os.path.join(BASE_DIR, "uploads", fname))
+    elif f.get("name", "").strip():
+        fname = f"signature_branch{bid}.png"
+        with open(os.path.join(BASE_DIR, "uploads", fname), "wb") as fh:
+            fh.write(render_signature(f["name"].strip()[:40], f.get("font", "segoesc"), f.get("ink", "blue")))
+    else:
+        flash("Upload a signature image or type a name to create one.", "error")
+        return redirect(url_for("branches"))
+    run("UPDATE branches SET signature_file=?, signatory_name=? WHERE id=?", (fname, f.get("name", "").strip() or b["signatory_name"], bid))
+    get_db().commit()
+    flash(f"Signature saved for {b['name']}.", "success")
+    return redirect(url_for("branches"))
+
+
 @app.route("/branches", methods=["GET", "POST"])
 @role_required("admin")
 def branches():
@@ -1577,7 +1627,7 @@ def branches():
         return redirect(url_for("branches"))
     rows = q("SELECT b.*, (SELECT COUNT(*) FROM counters c WHERE c.branch_id=b.id AND c.active=1) AS n_counters FROM branches b ORDER BY b.name")
     counters = q("SELECT c.*, b.name AS branch_name FROM counters c JOIN branches b ON b.id=c.branch_id ORDER BY b.name, c.code")
-    return render_template("branches.html", branches=rows, counters=counters)
+    return render_template("branches.html", branches=rows, counters=counters, sig_fonts=available_signature_fonts(), sig_inks=list(SIGNATURE_INKS))
 
 
 @app.route("/counters", methods=["POST"])
@@ -2417,7 +2467,7 @@ ACTION_LABELS = {
     "leave_new": "Applied for leave", "leave_decide": "Decided leave", "leave_cancel": "Withdrew leave",
     "leave_document": "Leave document", "award_give": "Gave award", "award_delete": "Removed award",
     "user_reset_device": "Reset device lock", "offer_form": "Saved offer",
-    "purchase_bill": "Supplier bill", "signature_generate": "Created digital signature", "hr_staff": "Saved staff profile", "hr_offer_letter": "Generated offer letter", "hr_id_card": "Generated ID card",
+    "purchase_bill": "Supplier bill", "signature_generate": "Created digital signature", "branch_signature_save": "Saved branch signature", "hr_staff": "Saved staff profile", "hr_offer_letter": "Generated offer letter", "hr_id_card": "Generated ID card",
     "hr_salary_slip": "Generated salary slip", "document_view": "Viewed staff document", "document_delete": "Deleted staff document",
     "document_signed": "Signed offer letter copy", "offer_toggle": "Switched offer on/off", "offer_delete": "Deleted offer",
     "report_export": "Exported report", "audit_export": "Exported login audit", "activity_export": "Exported activity log",
@@ -2765,6 +2815,17 @@ def signature_path():
     return path if path and os.path.exists(path) else None
 
 
+def signature_for(branch_id_):
+    """(image path or None, signatory name, source) for a branch, falling back to the company-wide signature."""
+    if branch_id_:
+        b = q("SELECT signature_file, signatory_name FROM branches WHERE id=?", (branch_id_,), one=True)
+        if b and b["signature_file"]:
+            path = os.path.join(BASE_DIR, "uploads", b["signature_file"])
+            if os.path.exists(path):
+                return path, b["signatory_name"] or "", "branch"
+    return signature_path(), get_setting("signatory_name", ""), "company"
+
+
 def hr_can_manage(u, target):
     if u["role"] == "admin":
         return True
@@ -2868,7 +2929,7 @@ def build_offer_letter(user, prof):
         story.append(Spacer(1, 8))
     story.append(Spacer(1, 24))
     story.append(Paragraph(f"For <b>{fields['company']}</b>", normal))
-    sig = signature_path()
+    sig, sname, _ = signature_for(user["branch_id"])
     if sig:
         from reportlab.platypus import Image as RLImage
         try:
@@ -2877,7 +2938,7 @@ def build_offer_letter(user, prof):
             story.append(Spacer(1, 30))
     else:
         story.append(Spacer(1, 30))
-    story.append(Paragraph("______________________<br/>Authorised Signatory" + (("<br/>" + st["signatory_name"]) if st.get("signatory_name") else ""), normal))
+    story.append(Paragraph("______________________<br/>Authorised Signatory" + (("<br/>" + sname) if sname else ""), normal))
     story.append(Spacer(1, 30))
     story.append(Paragraph("I accept the above offer.<br/><br/><br/>______________________<br/>" + fields["name"] + " &nbsp;&nbsp; Date: ___________", normal))
     doc.build(story)
@@ -2903,7 +2964,7 @@ def build_id_card(user, prof):
     valid = date.fromisoformat(vt).strftime("%d/%m/%Y")
     emp = prof.get("emp_code") or f"EMP{user['id']:04d}"
     company = st.get("shop_name", "")
-    sig = signature_path()
+    sig, _sn, _ = signature_for(user["branch_id"])
 
     def rounded_card(x, y):
         c.setDash(3, 3); c.setStrokeColor(colors.grey); c.setLineWidth(0.5)
@@ -3082,7 +3143,7 @@ def build_salary_slip(user, prof, ym, fig):
     if fig.get("note"):
         story.append(Spacer(1, 6)); story.append(Paragraph("Note: " + fig["note"], n))
     story.append(Spacer(1, 14))
-    sig = signature_path()
+    sig, sname, _ = signature_for(user["branch_id"])
     sig_cell = ""
     if sig:
         from reportlab.platypus import Image as RLImage
@@ -3090,7 +3151,6 @@ def build_salary_slip(user, prof, ym, fig):
             sig_cell = RLImage(sig, width=36 * mm, height=14 * mm, kind="proportional", hAlign="RIGHT")
         except Exception:
             sig_cell = ""
-    sname = all_settings().get("signatory_name", "")
     story.append(Table([["", sig_cell], [Paragraph("Employee signature", n), Paragraph("Authorised signatory" + (f"<br/>{sname}" if sname else ""), ParagraphStyle("r", parent=n, alignment=2))]],
                        colWidths=[89 * mm, 89 * mm], rowHeights=[16 * mm, None]))
     story.append(Spacer(1, 6))

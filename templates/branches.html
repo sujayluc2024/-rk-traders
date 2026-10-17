@@ -41,6 +41,30 @@
       <p class="hint">The branch code appears in every invoice number, e.g. KOL/C1/2627/00012. A new branch gets Counter 1 automatically.</p>
     </div>
     <div class="card">
+      <h2>Branch signatures</h2>
+      <p class="hint">Each branch can have its own authorised signature and signatory name for its bills, receipts, and staff documents. A branch without one uses the company signature from Settings.</p>
+      {% for b in branches if b.active %}
+      <div class="branch-sig">
+        <strong>{{ b.name }}</strong>
+        {% if b.signature_file %}<div><img src="{{ url_for('branch_signature', bid=b.id) }}?v={{ b.signature_file }}" alt="" style="max-height:56px;border:1px solid var(--border);padding:4px;background:#fff"><br><small class="hint">{{ b.signatory_name }} &middot; own signature</small>
+          <form method="post" action="{{ url_for('branch_signature_save', bid=b.id) }}" style="display:inline"><input type="hidden" name="remove" value="1"><button class="btn-link danger" style="font-size:12px">remove</button></form></div>
+        {% else %}<div><small class="hint">uses company signature</small></div>{% endif %}
+        <details><summary>Set signature for {{ b.name }}</summary>
+          <form method="post" action="{{ url_for('branch_signature_save', bid=b.id) }}" enctype="multipart/form-data">
+            <div class="field"><label>Signatory name</label><input type="text" name="name" value="{{ b.signatory_name or '' }}" maxlength="40" placeholder="e.g. S. Roy, Branch Manager"></div>
+            <div class="row">
+              <div class="field"><label>Style (to create from the name)</label><select name="font">{% for key, (label, path) in sig_fonts.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></div>
+              <div class="field"><label>Ink</label><select name="ink">{% for i in sig_inks %}<option value="{{ i }}">{{ i|title }}</option>{% endfor %}</select></div>
+            </div>
+            <div class="field"><label>Or upload a scanned signature (PNG/JPG)</label><input type="file" name="signature" accept=".png,.jpg,.jpeg"></div>
+            <button class="btn btn-sm">Save signature</button>
+            <p class="hint">If a file is chosen it is used; otherwise a signature is drawn from the name.</p>
+          </form>
+        </details>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="card">
       <h2 id="ctitle">Add counter</h2>
       <form method="post" action="{{ url_for('counters_save') }}">
         <input type="hidden" name="id" id="c_id">
