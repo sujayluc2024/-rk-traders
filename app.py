@@ -2871,7 +2871,7 @@ def logo_drawing(size_pt=42):
     try:
         from svglib.svglib import svg2rlg
         d = svg2rlg(os.path.join(BASE_DIR, "static", "logo-mark.svg"))
-        k = size_pt / 64.0
+        k = size_pt / 100.0
         d.scale(k, k)
         d.width, d.height = size_pt, size_pt
         return d
