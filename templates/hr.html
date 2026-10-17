@@ -4,17 +4,19 @@
 <div class="toolbar"><h1>Staff HR {% if current_user.role != 'admin' %}<small class="hint">{{ current_branch.name }} cashiers</small>{% endif %}</h1>
   {% if current_user.role == 'admin' %}<a href="{{ url_for('settings_page') }}#offer" class="btn btn-outline">Edit offer letter template</a>{% endif %}</div>
 <div class="card table-wrap"><table>
-  <tr><th></th><th>Staff</th><th>Role</th><th>Branch</th><th>Emp ID</th><th>Designation</th><th>Joined</th><th class="num">Salary</th><th class="num">Documents</th><th>Last slip</th><th></th></tr>
+  <tr><th></th><th>Staff</th><th>Role</th><th>Branch</th><th>Emp ID</th><th>Designation</th><th>Joined</th><th class="num">Salary</th><th class="num">Documents</th><th>Offer letter</th><th>Last slip</th><th></th></tr>
   {% for r in rows %}
   <tr>
     <td>{% if r.photo %}<img src="{{ url_for('photo_file', fname=r.photo) }}" class="avatar">{% else %}<span class="avatar ph">{{ r.full_name[:1] }}</span>{% endif %}</td>
     <td><a href="{{ url_for('hr_staff', uid=r.id) }}"><strong>{{ r.full_name }}</strong></a>{% if not r.active %} <span class="tag">inactive</span>{% endif %}<br><small class="hint">{{ r.username }}</small></td>
     <td>{{ r.role }}</td><td>{{ r.branch_name or 'All' }}</td><td>{{ r.emp_code or '-' }}</td><td>{{ r.designation or '-' }}</td><td>{{ r.joining_date or '-' }}</td>
     <td class="num">{{ r.monthly_salary|inr if r.monthly_salary else '<span class="low">not set</span>'|safe }}</td>
-    <td class="num">{{ r.docs }}</td><td>{{ r.last_slip or '-' }}</td>
+    <td class="num">{{ r.docs }}</td>
+    <td>{% if r.offers_signed %}<span class="tag cash">Signed</span>{% elif r.offers %}<span class="tag credit">Not signed</span>{% else %}<span class="hint">-</span>{% endif %}</td>
+    <td>{{ r.last_slip or '-' }}</td>
     <td style="white-space:nowrap"><a href="{{ url_for('hr_staff', uid=r.id) }}" class="btn btn-sm btn-outline">Profile</a> <a href="{{ url_for('hr_salary_slip', uid=r.id) }}" class="btn btn-sm">Salary slip</a></td>
   </tr>
-  {% else %}<tr><td colspan="11" class="empty">No staff.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="12" class="empty">No staff.</td></tr>{% endfor %}
 </table></div>
 <p class="hint">Fill each person's profile first (salary, designation, photo). Then generate the offer letter, ID card, and monthly salary slips from their profile page. Staff see their own documents under My documents.</p>
 {% endblock %}

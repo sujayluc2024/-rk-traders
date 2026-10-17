@@ -145,7 +145,7 @@
 
   <div class="footer">
     <div class="note" style="text-align:left;margin:0">{{ settings.invoice_footer }}</div>
-    <div class="sign">For {{ settings.shop_name }}<br><br>Authorised Signatory</div>
+    <div class="sign">For {{ settings.shop_name }}<br>{% if settings.signature_file %}<img src="{{ url_for('signature_image') }}" alt="" style="height:38px;display:block;margin:2px auto">{% else %}<br>{% endif %}Authorised Signatory</div>
   </div>
 </div>
 {% if autoprint %}<script>window.addEventListener('load', () => setTimeout(() => window.print(), 300));</script>{% endif %}

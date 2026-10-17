@@ -4,10 +4,10 @@
 <div class="toolbar"><h1>{{ 'Users' if is_admin else 'Cashiers of ' ~ current_branch.name }}</h1>{% if is_admin %}<a href="{{ url_for('settings_page') }}" class="btn btn-outline">Back to settings</a>{% endif %}</div>
 <div class="grid grid-2">
   <div class="card table-wrap">
-    <table><tr><th>Username</th><th>Name</th><th>Role</th><th>Branch</th><th>Joined</th><th>Device</th><th></th></tr>
+    <table><tr><th>Emp ID</th><th>Username</th><th>Name</th><th>Role / designation</th><th>Branch</th><th>Joined</th><th>Device</th><th></th></tr>
     {% for u in users %}
-    <tr><td><strong>{{ u.username }}</strong>{% if not u.active %} <span class="tag">inactive</span>{% endif %}</td><td>{{ u.full_name }}</td>
-        <td><span class="tag">{{ u.role }}</span>{% if u.can_manage_users %}<br><small class="hint">can add cashiers</small>{% endif %}{% if u.can_view_analytics %}<br><small class="hint">analytics access</small>{% endif %}{% if u.can_reset_device %}<br><small class="hint">can reset devices</small>{% endif %}{% if u.can_hr_docs %}<br><small class="hint">HR documents</small>{% endif %}</td>
+    <tr><td><code>{{ u.emp_code or '-' }}</code></td><td><strong>{{ u.username }}</strong>{% if not u.active %} <span class="tag">inactive</span>{% endif %}</td><td>{{ u.full_name }}</td>
+        <td><span class="tag">{{ u.role }}</span>{% if u.designation %} {{ u.designation }}{% endif %}{% if u.can_manage_users %}<br><small class="hint">can add cashiers</small>{% endif %}{% if u.can_view_analytics %}<br><small class="hint">analytics access</small>{% endif %}{% if u.can_reset_device %}<br><small class="hint">can reset devices</small>{% endif %}{% if u.can_hr_docs %}<br><small class="hint">HR documents</small>{% endif %}</td>
         <td>{{ u.branch_name or 'All branches' }}</td><td>{{ u.joining_date or '-' }}</td>
         <td>{% if not u.device_lock %}<span class="hint">not locked</span>{% elif u.bound_ip %}<span class="tag cash" title="since {{ u.bound_at }}">{{ u.bound_ip }}</span>
             {% if can_reset_device %}<form method="post" action="{{ url_for('user_reset_device', uid=u.id) }}" style="display:inline" onsubmit="return confirm('Reset device for {{ u.full_name }}? Their next login will register a new device.')"><button class="btn-link" style="font-size:12px">reset</button></form>{% endif %}
@@ -36,6 +36,11 @@
       <div class="field" id="u_analytics_wrap"><label class="checkbox"><input type="checkbox" name="can_view_analytics" id="u_can_analytics"> Allow access to the Analytics dashboard (own branch for managers and cashiers)</label></div>
       {% endif %}
       <div class="row">
+        <div class="field"><label>Designation</label>
+          <select name="designation" id="u_designation">{% for d in designations %}<option value="{{ d }}">{{ d }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Employee ID</label><input type="text" id="u_emp" value="{{ next_code }}" readonly title="Generated automatically"></div>
+      </div>
+      <div class="row">
         <div class="field"><label>Joining date <span class="hint">(for leave entitlement)</span></label><input type="date" name="joining_date" id="u_joining" value="{{ today }}"></div>
         <div class="field"><label>Password <span id="pwhint"></span></label><input type="password" name="password" id="u_password" required minlength="4"></div>
       </div>
@@ -43,7 +48,7 @@
       <div class="field" id="u_active_wrap" style="display:none"><label class="checkbox"><input type="checkbox" name="active" id="u_active" checked> Active</label></div>
       <button class="btn">Save</button> <button type="button" class="btn btn-outline" onclick="editUser()">Clear</button>
     </form>
-    <p class="hint">{% if is_admin %}Cashiers and managers belong to one branch and can only see that branch. Admins see all branches.{% else %}New users are created as cashiers of your branch. Untick Active to stop someone logging in.{% endif %}</p>
+    <p class="hint">{% if is_admin %}Cashiers and managers belong to one branch and can only see that branch. Admins see all branches.{% else %}New users are created as cashiers of your branch. Untick Active to stop someone logging in.{% endif %} The Employee ID is generated automatically; the prefix and the designation list are set under Settings.</p>
     <p class="hint"><strong>Device lock:</strong> the first login saves the computer's network address. A login from another address is refused with a message. If a computer is replaced or its address changes, click <em>reset</em> next to the user. Give each counter PC a fixed address in your router so the lock stays reliable.</p>
   </div>
 </div>
@@ -73,6 +78,10 @@ function editUser(u) {
     roleChanged();
   }
   document.getElementById('u_joining').value = u.joining_date || (u.id ? '' : '{{ today }}');
+  document.getElementById('u_emp').value = u.id ? (u.emp_code || '') : '{{ next_code }}';
+  const ds = document.getElementById('u_designation');
+  if (u.designation && ![...ds.options].some(o => o.value === u.designation)) ds.add(new Option(u.designation, u.designation));
+  ds.value = u.designation || (u.id ? '' : ds.options[0].value);
   document.getElementById('u_password').value = '';
   document.getElementById('u_password').required = !u.id;
   document.getElementById('pwhint').textContent = u.id ? '(leave blank to keep current)' : '';

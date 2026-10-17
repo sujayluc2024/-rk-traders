@@ -77,6 +77,8 @@ def migrate(db):
     wanted["sale_items"] = [("offer_name", "TEXT"), ("offer_discount", "REAL NOT NULL DEFAULT 0")]
     wanted.pop("sales_extra")
     wanted["purchases"] = [("bill_file", "TEXT"), ("bill_name", "TEXT")]
+    wanted["staff_profiles"] = [("id_valid_till", "TEXT")]
+    wanted["staff_documents"] = [("signed_file", "TEXT"), ("signed_name", "TEXT"), ("signed_at", "TEXT"), ("signed_by", "INTEGER")]
     wanted["users"] = [("joining_date", "TEXT"), ("can_manage_users", "INTEGER NOT NULL DEFAULT 0"),
                        ("can_view_analytics", "INTEGER NOT NULL DEFAULT 0"),
                        ("device_lock", "INTEGER NOT NULL DEFAULT 1"), ("bound_ip", "TEXT"), ("bound_at", "TEXT"),
@@ -113,6 +115,10 @@ def init_db():
         "state_code": "19",
         "invoice_footer": "Thank you for shopping with us! Goods once sold will not be taken back.",
         "allow_negative_stock": "0",
+        "emp_id_prefix": "RKT",
+        "designations": "Cashier, Senior Cashier, Store Helper, Delivery Staff, Supervisor, Store Manager, Branch Manager, Accountant",
+        "id_card_validity_years": "2",
+        "signature_file": "",
         "offer_letter_template": (
             "Dear {name},\n\n"
             "We are pleased to offer you the position of {designation} at {company}, {branch}, with effect from {joining_date}.\n\n"
@@ -126,6 +132,13 @@ def init_db():
     db.execute("UPDATE users SET device_lock=0 WHERE role='admin' AND bound_ip IS NULL AND device_lock=1 "
                "AND NOT EXISTS (SELECT 1 FROM settings WHERE key='device_lock_initialised')")
     db.execute("INSERT OR IGNORE INTO settings(key,value) VALUES ('device_lock_initialised','1')")
+    prefix = (db.execute("SELECT value FROM settings WHERE key='emp_id_prefix'").fetchone() or ["RKT"])[0] or "RKT"
+    for (uid,) in db.execute("SELECT u.id FROM users u LEFT JOIN staff_profiles p ON p.user_id=u.id "
+                             "WHERE p.emp_code IS NULL OR p.emp_code='' ORDER BY u.id").fetchall():
+        n = 1 + max([int(r[0][len(prefix) + 1:]) for r in db.execute("SELECT emp_code FROM staff_profiles WHERE emp_code LIKE ?", (prefix + "-%",))
+                     if r[0][len(prefix) + 1:].isdigit()] or [0])
+        db.execute("INSERT INTO staff_profiles(user_id,emp_code) VALUES (?,?) ON CONFLICT(user_id) DO UPDATE SET emp_code=excluded.emp_code",
+                   (uid, f"{prefix}-{n:03d}"))
     if db.execute("SELECT COUNT(*) FROM leave_policies").fetchone()[0] == 0:
         for i, (t, d, m) in enumerate([("Casual", 12, 0), ("Sick", 10, 0), ("Earned", 15, 6), ("Unpaid", 0, 0), ("Other", 0, 0)]):
             db.execute("INSERT INTO leave_policies(leave_type,days_per_year,eligible_after_months,sort_order) VALUES (?,?,?,?)", (t, d, m, i))
@@ -1441,8 +1454,20 @@ def report_export():
 @role_required("admin")
 def settings_page():
     if request.method == "POST":
+        sig = request.files.get("signature")
+        if sig and sig.filename:
+            ext = sig.filename.rsplit(".", 1)[-1].lower() if "." in sig.filename else ""
+            if ext not in ("png", "jpg", "jpeg"):
+                flash("Signature must be a PNG or JPG image.", "error")
+                return redirect(url_for("settings_page"))
+            os.makedirs(os.path.join(BASE_DIR, "uploads"), exist_ok=True)
+            fname = f"signature.{ext}"
+            sig.save(os.path.join(BASE_DIR, "uploads", fname))
+            run("INSERT INTO settings(key,value) VALUES ('signature_file',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (fname,))
+        if request.form.get("remove_signature"):
+            run("UPDATE settings SET value='' WHERE key='signature_file'")
         for k in ["shop_name", "shop_tagline", "shop_address", "shop_phone", "shop_gstin", "state_name", "state_code", "invoice_footer",
-                  "offer_letter_template"]:
+                  "offer_letter_template", "emp_id_prefix", "designations", "id_card_validity_years"]:
             run("INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (k, request.form.get(k, "").strip()))
         run("INSERT INTO settings(key,value) VALUES ('allow_negative_stock',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
@@ -1451,6 +1476,15 @@ def settings_page():
         flash("Settings saved.", "success")
         return redirect(url_for("settings_page"))
     return render_template("settings.html")
+
+
+@app.route("/signature")
+@login_required
+def signature_image():
+    path = signature_path()
+    if not path:
+        abort(404)
+    return send_from_directory(os.path.dirname(path), os.path.basename(path))
 
 
 @app.route("/branches", methods=["GET", "POST"])
@@ -1525,26 +1559,33 @@ def users():
                 run("UPDATE users SET full_name=?,role=?,branch_id=?,active=?,joining_date=?,can_manage_users=?,can_view_analytics=?,device_lock=?,"
                     "can_reset_device=?,can_hr_docs=? WHERE id=?",
                     (f["full_name"].strip(), role, bid, 1 if f.get("active") else 0, joining, can_manage, can_analytics, device_lock, can_reset, can_hr, f["id"]))
+                if f.get("designation") is not None:
+                    run("INSERT INTO staff_profiles(user_id,emp_code,designation) VALUES (?,?,?) "
+                        "ON CONFLICT(user_id) DO UPDATE SET designation=excluded.designation", (f["id"], next_emp_code(), f.get("designation", "").strip()))
                 if not device_lock:
                     run("UPDATE users SET bound_ip=NULL, bound_at=NULL WHERE id=?", (f["id"],))   # lock off = forget the device
                 if f.get("password"):
                     run("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(f["password"]), f["id"]))
             else:
-                run("INSERT INTO users(username,password_hash,full_name,role,branch_id,joining_date,can_manage_users,can_view_analytics,device_lock,"
-                    "can_reset_device,can_hr_docs) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                    (f["username"].strip().lower(), generate_password_hash(f["password"]), f["full_name"].strip(), role, bid, joining, can_manage,
-                     can_analytics, device_lock, can_reset, can_hr))
+                new_id = run("INSERT INTO users(username,password_hash,full_name,role,branch_id,joining_date,can_manage_users,can_view_analytics,device_lock,"
+                             "can_reset_device,can_hr_docs) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                             (f["username"].strip().lower(), generate_password_hash(f["password"]), f["full_name"].strip(), role, bid, joining, can_manage,
+                              can_analytics, device_lock, can_reset, can_hr))
+                run("INSERT INTO staff_profiles(user_id,emp_code,designation) VALUES (?,?,?)",
+                    (new_id, next_emp_code(), f.get("designation", "").strip() or role.title()))
             get_db().commit()
             flash("User saved.", "success")
         except sqlite3.IntegrityError:
             flash("Username already exists.", "error")
         return redirect(url_for("users"))
     if is_admin:
-        rows = q("SELECT u.*, b.name AS branch_name FROM users u LEFT JOIN branches b ON b.id=u.branch_id ORDER BY u.username")
+        rows = q("SELECT u.*, b.name AS branch_name, p.emp_code, p.designation FROM users u LEFT JOIN branches b ON b.id=u.branch_id "
+                 "LEFT JOIN staff_profiles p ON p.user_id=u.id ORDER BY u.username")
     else:
-        rows = q("SELECT u.*, b.name AS branch_name FROM users u LEFT JOIN branches b ON b.id=u.branch_id "
-                 "WHERE u.role='cashier' AND u.branch_id=? ORDER BY u.username", (u["branch_id"],))
-    return render_template("users.html", users=rows, branches=q("SELECT * FROM branches WHERE active=1 ORDER BY name"), is_admin=is_admin)
+        rows = q("SELECT u.*, b.name AS branch_name, p.emp_code, p.designation FROM users u LEFT JOIN branches b ON b.id=u.branch_id "
+                 "LEFT JOIN staff_profiles p ON p.user_id=u.id WHERE u.role='cashier' AND u.branch_id=? ORDER BY u.username", (u["branch_id"],))
+    return render_template("users.html", users=rows, branches=q("SELECT * FROM branches WHERE active=1 ORDER BY name"), is_admin=is_admin,
+                           designations=designation_list(), next_code=next_emp_code())
 
 
 @app.route("/users/<int:uid>/reset-device", methods=["POST"])
@@ -2307,14 +2348,15 @@ ACTION_LABELS = {
     "leave_document": "Leave document", "award_give": "Gave award", "award_delete": "Removed award",
     "user_reset_device": "Reset device lock", "offer_form": "Saved offer",
     "purchase_bill": "Supplier bill", "hr_staff": "Saved staff profile", "hr_offer_letter": "Generated offer letter", "hr_id_card": "Generated ID card",
-    "hr_salary_slip": "Generated salary slip", "document_view": "Viewed staff document", "document_delete": "Deleted staff document", "offer_toggle": "Switched offer on/off", "offer_delete": "Deleted offer",
+    "hr_salary_slip": "Generated salary slip", "document_view": "Viewed staff document", "document_delete": "Deleted staff document",
+    "document_signed": "Signed offer letter copy", "offer_toggle": "Switched offer on/off", "offer_delete": "Deleted offer",
     "report_export": "Exported report", "audit_export": "Exported login audit", "activity_export": "Exported activity log",
     "sales_export": "Exported bills register", "receipts_export": "Exported receipts", "stock_export": "Exported stock list",
     "customers_export": "Exported customer list",
 }
 SKIP_ENDPOINTS = {"static", "api_product_search", "api_customer_search", "api_notices_unread", "api_branch_stock", "notice_mark_read"}
 LOGGED_GETS = {"logout", "switch_branch", "report_export", "audit_export", "activity_export", "sales_export", "receipts_export",
-               "stock_export", "customers_export", "document_view", "purchase_bill"}
+               "stock_export", "customers_export", "document_view", "purchase_bill", "document_signed"}
 SECRET_KEYS = ("password", "old", "new", "confirm")
 
 
@@ -2366,6 +2408,8 @@ def record_activity(response):
             action = "Uploaded leave document" if request.method == "POST" else "Viewed leave document"
         elif ep == "purchase_bill":
             action = "Attached supplier bill" if request.method == "POST" else "Viewed supplier bill"
+        elif ep == "document_signed":
+            action = "Uploaded signed offer letter" if request.method == "POST" else "Viewed signed offer letter"
         elif ep == "users" and not request.form.get("id"):
             action = "Created user"
         elif ep == "leave_decide":
@@ -2634,6 +2678,23 @@ PHOTO_DIR = os.path.join(BASE_DIR, "uploads", "photos")
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 
 
+def next_emp_code():
+    prefix = get_setting("emp_id_prefix", "RKT").strip() or "RKT"
+    nums = [int(r["emp_code"][len(prefix) + 1:]) for r in q("SELECT emp_code FROM staff_profiles WHERE emp_code LIKE ?", (prefix + "-%",))
+            if r["emp_code"][len(prefix) + 1:].isdigit()]
+    return f"{prefix}-{(max(nums) + 1 if nums else 1):03d}"
+
+
+def designation_list():
+    return [x.strip() for x in get_setting("designations", "").split(",") if x.strip()]
+
+
+def signature_path():
+    f = get_setting("signature_file", "")
+    path = os.path.join(BASE_DIR, "uploads", f) if f else None
+    return path if path and os.path.exists(path) else None
+
+
 def hr_can_manage(u, target):
     if u["role"] == "admin":
         return True
@@ -2735,8 +2796,18 @@ def build_offer_letter(user, prof):
     for para in body.split("\n\n"):
         story.append(Paragraph(para.replace("\n", "<br/>"), normal))
         story.append(Spacer(1, 8))
-    story.append(Spacer(1, 30))
-    story.append(Paragraph(f"For <b>{fields['company']}</b><br/><br/><br/>______________________<br/>Authorised Signatory", normal))
+    story.append(Spacer(1, 24))
+    story.append(Paragraph(f"For <b>{fields['company']}</b>", normal))
+    sig = signature_path()
+    if sig:
+        from reportlab.platypus import Image as RLImage
+        try:
+            story.append(RLImage(sig, width=40 * mm, height=16 * mm, kind="proportional", hAlign="LEFT"))
+        except Exception:
+            story.append(Spacer(1, 30))
+    else:
+        story.append(Spacer(1, 30))
+    story.append(Paragraph("______________________<br/>Authorised Signatory", normal))
     story.append(Spacer(1, 30))
     story.append(Paragraph("I accept the above offer.<br/><br/><br/>______________________<br/>" + fields["name"] + " &nbsp;&nbsp; Date: ___________", normal))
     doc.build(story)
@@ -2757,9 +2828,12 @@ def build_id_card(user, prof):
     c.setTitle("ID Card")
     W, H = 54 * mm, 85.6 * mm
     teal, teal_dark, orange = colors.HexColor("#0f766e"), colors.HexColor("#0b5c56"), colors.HexColor("#f59e0b")
-    valid = (date.today().replace(year=date.today().year + 2)).strftime("%m/%Y")
+    years = int(st.get("id_card_validity_years") or 2)
+    vt = prof.get("id_valid_till") or date.today().replace(year=date.today().year + years).isoformat()
+    valid = date.fromisoformat(vt).strftime("%d/%m/%Y")
     emp = prof.get("emp_code") or f"EMP{user['id']:04d}"
     company = st.get("shop_name", "")
+    sig = signature_path()
 
     def rounded_card(x, y):
         c.setDash(3, 3); c.setStrokeColor(colors.grey); c.setLineWidth(0.5)
@@ -2822,6 +2896,11 @@ def build_id_card(user, prof):
     c.setFillColor(colors.white); c.setFont(font, 5.5)
     c.drawString(x0 + 3 * mm, y0 + 2.3 * mm, f"Valid till {valid}")
     c.drawRightString(x0 + W - 3 * mm, y0 + 2.3 * mm, "Authorised Signatory")
+    if sig:
+        try:
+            c.drawImage(sig, x0 + W - 20 * mm, y0 + 6.3 * mm, 16 * mm, 6 * mm, preserveAspectRatio=True, anchor="se", mask="auto")
+        except Exception:
+            pass
     rounded_card(x0, y0)
 
     # ---------------- back ----------------
@@ -2932,8 +3011,17 @@ def build_salary_slip(user, prof, ym, fig):
     story.append(t3)
     if fig.get("note"):
         story.append(Spacer(1, 6)); story.append(Paragraph("Note: " + fig["note"], n))
-    story.append(Spacer(1, 26))
-    story.append(Table([[Paragraph("Employee signature", n), Paragraph("Authorised signatory", ParagraphStyle("r", parent=n, alignment=2))]], colWidths=[89 * mm, 89 * mm]))
+    story.append(Spacer(1, 14))
+    sig = signature_path()
+    sig_cell = ""
+    if sig:
+        from reportlab.platypus import Image as RLImage
+        try:
+            sig_cell = RLImage(sig, width=36 * mm, height=14 * mm, kind="proportional", hAlign="RIGHT")
+        except Exception:
+            sig_cell = ""
+    story.append(Table([["", sig_cell], [Paragraph("Employee signature", n), Paragraph("Authorised signatory", ParagraphStyle("r", parent=n, alignment=2))]],
+                       colWidths=[89 * mm, 89 * mm], rowHeights=[16 * mm, None]))
     story.append(Spacer(1, 6))
     story.append(Paragraph(f"Generated on {datetime.now().strftime('%d-%m-%Y %I:%M %p')}. This is a computer generated slip.",
                            ParagraphStyle("f", parent=n, fontSize=7.5, textColor="#666666")))
@@ -2950,6 +3038,8 @@ def hr():
         return redirect(url_for("dashboard"))
     base = ("SELECT u.id, u.username, u.full_name, u.role, u.joining_date, u.active, b.name AS branch_name, p.emp_code, p.designation, p.monthly_salary, "
             "p.photo, (SELECT COUNT(*) FROM staff_documents d WHERE d.user_id=u.id) AS docs, "
+            "(SELECT COUNT(*) FROM staff_documents d WHERE d.user_id=u.id AND d.kind='offer_letter') AS offers, "
+            "(SELECT COUNT(*) FROM staff_documents d WHERE d.user_id=u.id AND d.kind='offer_letter' AND d.signed_file IS NOT NULL) AS offers_signed, "
             "(SELECT MAX(period) FROM staff_documents d WHERE d.user_id=u.id AND d.kind='salary_slip') AS last_slip "
             "FROM users u LEFT JOIN branches b ON b.id=u.branch_id LEFT JOIN staff_profiles p ON p.user_id=u.id ")
     rows = q(base + "ORDER BY u.active DESC, b.name, u.full_name") if u["role"] == "admin" else \
@@ -2976,7 +3066,8 @@ def hr_staff(uid):
             os.makedirs(PHOTO_DIR, exist_ok=True)
             photo = f"u{uid}_{int(datetime.now().timestamp())}.{ext}"
             file.save(os.path.join(PHOTO_DIR, photo))
-        vals = (f.get("emp_code", "").strip() or None, f.get("designation", "").strip(), f.get("phone", "").strip(), f.get("address", "").strip(),
+        current = profile_of(uid)
+        vals = (current.get("emp_code") or next_emp_code(), f.get("designation", "").strip(), f.get("phone", "").strip(), f.get("address", "").strip(),
                 f.get("dob") or None, f.get("blood_group", "").strip(), float(f.get("monthly_salary") or 0), float(f.get("hra") or 0),
                 float(f.get("allowances") or 0), f.get("bank_name", "").strip(), f.get("account_no", "").strip(), f.get("ifsc", "").strip(),
                 f.get("pan", "").strip().upper(), f.get("emergency_contact", "").strip())
@@ -2994,7 +3085,10 @@ def hr_staff(uid):
         flash("Profile saved.", "success")
         return redirect(url_for("hr_staff", uid=uid))
     docs = q("SELECT d.*, c.full_name AS creator FROM staff_documents d LEFT JOIN users c ON c.id=d.created_by WHERE d.user_id=? ORDER BY d.id DESC", (uid,))
-    return render_template("hr_staff.html", t=target, p=profile_of(uid), docs=docs, this_month=date.today().strftime("%Y-%m"))
+    years = int(get_setting("id_card_validity_years", "2") or 2)
+    default_valid = date.today().replace(year=date.today().year + years).isoformat()
+    return render_template("hr_staff.html", t=target, p=profile_of(uid), docs=docs, this_month=date.today().strftime("%Y-%m"),
+                           designations=designation_list(), default_valid=default_valid)
 
 
 @app.route("/hr/<int:uid>/offer-letter", methods=["POST"])
@@ -3017,6 +3111,16 @@ def hr_id_card(uid):
     target = hr_user(uid) or abort(404)
     if not hr_can_manage(u, target):
         abort(403)
+    valid = request.form.get("valid_till")
+    if valid:
+        try:
+            date.fromisoformat(valid)
+        except ValueError:
+            flash("Enter a valid date for the card validity.", "error")
+            return redirect(url_for("hr_staff", uid=uid))
+        run("INSERT INTO staff_profiles(user_id,emp_code,id_valid_till) VALUES (?,?,?) ON CONFLICT(user_id) DO UPDATE SET id_valid_till=excluded.id_valid_till",
+            (uid, next_emp_code(), valid))
+        get_db().commit()
     pdf, data = build_id_card(target, profile_of(uid))
     did = _save_doc(uid, "id_card", f"ID card - {target['full_name']}", None, pdf, data)
     flash("ID card generated.", "success")
@@ -3071,6 +3175,48 @@ def document_view(did):
         abort(403)
     return send_from_directory(DOC_DIR, d["file"], as_attachment=request.args.get("download") == "1",
                                download_name=secure_filename(d["title"]) + ".pdf", mimetype="application/pdf")
+
+
+@app.route("/documents/<int:did>/signed", methods=["GET", "POST"])
+@login_required
+def document_signed(did):
+    """Signed copy of an offer letter: the staff member (or HR) uploads it; HR and the staff member can view it."""
+    u = current_user()
+    d = q("SELECT * FROM staff_documents WHERE id=?", (did,), one=True) or abort(404)
+    target = hr_user(d["user_id"])
+    is_owner = d["user_id"] == u["id"]
+    if not (is_owner or (target and hr_can_manage(u, target))):
+        abort(403)
+    if request.method == "POST":
+        file = request.files.get("signed")
+        if not file or not file.filename:
+            flash("Choose the signed copy first.", "error")
+            return redirect(request.referrer or url_for("my_documents"))
+        ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+        if ext not in ALLOWED_DOCS:
+            flash("Signed copy must be a PDF, JPG or PNG.", "error")
+            return redirect(request.referrer or url_for("my_documents"))
+        os.makedirs(DOC_DIR, exist_ok=True)
+        stored = f"signed_{did}_{int(datetime.now().timestamp())}.{ext}"
+        file.save(os.path.join(DOC_DIR, stored))
+        if d["signed_file"]:
+            try:
+                os.remove(os.path.join(DOC_DIR, d["signed_file"]))
+            except OSError:
+                pass
+        run("UPDATE staff_documents SET signed_file=?, signed_name=?, signed_at=datetime('now','localtime'), signed_by=? WHERE id=?",
+            (stored, file.filename, u["id"], did))
+        who = [r["id"] for r in q("SELECT id FROM users WHERE role='admin' AND active=1")] + [d["created_by"]]
+        if is_owner:
+            notify(who, f"Signed copy uploaded: {d['title']}", f"{u['full_name']} uploaded the signed copy. Open Staff HR to view it.", u["id"])
+        else:
+            notify([d["user_id"]], f"Signed copy filed: {d['title']}", "The office has filed your signed copy. You can view it under My documents.", u["id"])
+        get_db().commit()
+        flash("Signed copy saved.", "success")
+        return redirect(request.referrer or url_for("my_documents"))
+    if not d["signed_file"]:
+        abort(404)
+    return send_from_directory(DOC_DIR, d["signed_file"], as_attachment=False, download_name=d["signed_name"])
 
 
 @app.route("/documents/<int:did>/delete", methods=["POST"])

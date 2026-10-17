@@ -5,7 +5,7 @@
   <div><a href="{{ url_for('branches') }}" class="btn btn-outline">Branches &amp; Counters</a> <a href="{{ url_for('users') }}" class="btn btn-outline">Users</a> <a href="{{ url_for('leave_policy') }}" class="btn btn-outline">Leave policy</a></div></div>
 <div class="card" style="max-width:720px">
   <h2>Shop details (printed on every bill)</h2>
-  <form method="post">
+  <form method="post" enctype="multipart/form-data">
     <div class="row">
       <div class="field"><label>Shop name</label><input type="text" name="shop_name" value="{{ settings.shop_name }}" required></div>
       <div class="field"><label>Tagline</label><input type="text" name="shop_tagline" value="{{ settings.shop_tagline }}"></div>
@@ -21,6 +21,19 @@
     </div>
     <div class="field"><label>Invoice footer note</label><textarea name="invoice_footer" rows="2">{{ settings.invoice_footer }}</textarea></div>
     <div class="field"><label class="checkbox"><input type="checkbox" name="allow_negative_stock" {{ 'checked' if settings.allow_negative_stock=='1' }}> Allow billing when stock is zero (stock can go negative)</label></div>
+    <h2 style="margin-top:18px">Staff settings</h2>
+    <div class="row">
+      <div class="field"><label>Employee ID prefix</label><input type="text" name="emp_id_prefix" value="{{ settings.emp_id_prefix }}" maxlength="8"> <span class="hint">IDs look like {{ settings.emp_id_prefix }}-001</span></div>
+      <div class="field"><label>ID card validity (years)</label><input type="number" min="1" max="10" name="id_card_validity_years" value="{{ settings.id_card_validity_years }}"></div>
+    </div>
+    <div class="field"><label>Designations (comma separated)</label><input type="text" name="designations" value="{{ settings.designations }}"></div>
+    <h2 style="margin-top:18px">Authorised signature</h2>
+    <div class="row">
+      <div class="field">{% if settings.signature_file %}<img src="{{ url_for('signature_image') }}" alt="signature" style="max-height:70px;border:1px solid var(--border);padding:6px;background:#fff"><br>
+        <label class="checkbox" style="margin-top:6px"><input type="checkbox" name="remove_signature" value="1"> Remove signature</label>{% else %}<span class="hint">No signature uploaded yet.</span>{% endif %}</div>
+      <div class="field"><label>Upload signature image (PNG with transparent background works best, or JPG)</label><input type="file" name="signature" accept=".png,.jpg,.jpeg"></div>
+    </div>
+    <p class="hint">The signature prints above "Authorised Signatory" on invoices, receipts, offer letters, salary slips, and ID cards.</p>
     <h2 id="offer" style="margin-top:18px">Offer letter template</h2>
     <div class="field"><textarea name="offer_letter_template" rows="12">{{ settings.offer_letter_template }}</textarea></div>
     <p class="hint">Placeholders filled automatically: {name}, {designation}, {branch}, {joining_date}, {salary}, {salary_words}, {company}, {date}. Leave a blank line between paragraphs.</p>

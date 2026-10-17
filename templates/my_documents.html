@@ -14,18 +14,20 @@
       <tr><td>Joined</td><td>{{ t.joining_date or '-' }}</td></tr>
       <tr><td>Phone</td><td>{{ p.phone or '-' }}</td></tr>
     </table>
-    <p class="hint">If anything here is wrong, tell your manager or the admin.</p>
+    <p class="hint">If anything here is wrong, tell your manager or the admin. After you sign your offer letter, take a photo or scan and upload it in the Signed copy column.</p>
   </div>
   <div class="card table-wrap" style="grid-column: span 2">
     <h2>Documents</h2>
     <table>
-      <tr><th>Document</th><th>Type</th><th>Issued</th><th></th></tr>
+      <tr><th>Document</th><th>Type</th><th>Issued</th><th>Signed copy</th><th></th></tr>
       {% for d in docs %}
       <tr><td><a href="{{ url_for('document_view', did=d.id) }}" target="_blank"><strong>{{ d.title }}</strong></a></td>
           <td><span class="tag {{ 'cash' if d.kind=='salary_slip' else ('upi' if d.kind=='id_card' else '') }}">{{ {'offer_letter':'Offer letter','id_card':'ID card','salary_slip':'Salary slip'}[d.kind] }}</span></td>
           <td>{{ d.created_at }}</td>
+          <td>{% if d.kind == 'offer_letter' %}{% if d.signed_file %}<a href="{{ url_for('document_signed', did=d.id) }}" target="_blank" class="tag cash">&#10003; Uploaded {{ d.signed_at[:10] }}</a>{% else %}<span class="tag credit">Please sign and upload</span>{% endif %}
+              <form method="post" action="{{ url_for('document_signed', did=d.id) }}" enctype="multipart/form-data" class="inline-form" style="margin-top:4px"><input type="file" name="signed" accept=".pdf,.jpg,.jpeg,.png" required style="width:170px"><button class="btn btn-sm">{{ 'Replace' if d.signed_file else 'Upload' }}</button></form>{% else %}-{% endif %}</td>
           <td style="white-space:nowrap"><a href="{{ url_for('document_view', did=d.id) }}" target="_blank" class="btn btn-sm btn-outline">View / Print</a> <a href="{{ url_for('document_view', did=d.id, download=1) }}" class="btn btn-sm btn-outline">Download</a></td></tr>
-      {% else %}<tr><td colspan="4" class="empty">No documents issued to you yet.</td></tr>{% endfor %}
+      {% else %}<tr><td colspan="5" class="empty">No documents issued to you yet.</td></tr>{% endfor %}
     </table>
   </div>
 </div>

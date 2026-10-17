@@ -9,8 +9,10 @@
       <div class="row">
         <div class="field" style="flex:0 0 110px">{% if p.photo %}<img src="{{ url_for('photo_file', fname=p.photo) }}" class="photo-lg">{% else %}<div class="photo-lg ph">No photo</div>{% endif %}</div>
         <div class="field"><label>Photo (JPG/PNG, for ID card)</label><input type="file" name="photo" accept=".jpg,.jpeg,.png">
-          <label style="margin-top:10px">Employee ID</label><input type="text" name="emp_code" value="{{ p.emp_code or '' }}" placeholder="e.g. RK-001"></div>
-        <div class="field"><label>Designation</label><input type="text" name="designation" value="{{ p.designation or '' }}" placeholder="e.g. Billing Cashier">
+          <label style="margin-top:10px">Employee ID <span class="hint">(auto)</span></label><input type="text" value="{{ p.emp_code or '' }}" readonly></div>
+        <div class="field"><label>Designation</label>
+          <select name="designation">{% for d in designations %}<option value="{{ d }}" {{ 'selected' if p.designation==d }}>{{ d }}</option>{% endfor %}
+            {% if p.designation and p.designation not in designations %}<option value="{{ p.designation }}" selected>{{ p.designation }}</option>{% endif %}</select>
           <label style="margin-top:10px">Joining date</label><input type="date" name="joining_date" value="{{ t.joining_date or '' }}"></div>
       </div>
       <div class="row">
@@ -40,7 +42,10 @@
     <div class="card">
       <h2>Generate documents</h2>
       <form method="post" action="{{ url_for('hr_offer_letter', uid=t.id) }}"><button class="btn btn-lg" style="margin-bottom:8px">&#128196; Offer letter</button></form>
-      <form method="post" action="{{ url_for('hr_id_card', uid=t.id) }}"><button class="btn btn-lg" style="margin-bottom:8px">&#127380; ID card</button></form>
+      <form method="post" action="{{ url_for('hr_id_card', uid=t.id) }}" style="margin-bottom:8px">
+        <label>ID card valid till</label>
+        <div class="inline-form"><input type="date" name="valid_till" value="{{ p.id_valid_till or default_valid }}" style="width:170px"><button class="btn">&#127380; ID card</button></div>
+      </form>
       <a href="{{ url_for('hr_salary_slip', uid=t.id) }}" class="btn btn-lg btn-accent">&#8377; Salary slip</a>
       <p class="hint">Each document is saved as a PDF, listed below, and the staff member is notified. Save the profile first so the details are right.</p>
     </div>
@@ -48,7 +53,9 @@
       <h2>Documents issued</h2>
       <table>
         {% for d in docs %}
-        <tr><td><a href="{{ url_for('document_view', did=d.id) }}" target="_blank"><strong>{{ d.title }}</strong></a><br><small class="hint">{{ d.created_at }} &middot; by {{ d.creator }}</small></td>
+        <tr><td><a href="{{ url_for('document_view', did=d.id) }}" target="_blank"><strong>{{ d.title }}</strong></a><br><small class="hint">{{ d.created_at }} &middot; by {{ d.creator }}</small>
+            {% if d.kind == 'offer_letter' %}<br>{% if d.signed_file %}<a href="{{ url_for('document_signed', did=d.id) }}" target="_blank" class="tag cash">&#10003; Signed copy ({{ d.signed_at[:10] }})</a>{% else %}<span class="tag credit">Not yet signed</span>{% endif %}
+              <form method="post" action="{{ url_for('document_signed', did=d.id) }}" enctype="multipart/form-data" class="inline-form" style="margin-top:4px"><input type="file" name="signed" accept=".pdf,.jpg,.jpeg,.png" required style="width:170px"><button class="btn btn-sm btn-outline">{{ 'Replace' if d.signed_file else 'File signed copy' }}</button></form>{% endif %}</td>
             <td style="white-space:nowrap"><a href="{{ url_for('document_view', did=d.id, download=1) }}" class="btn btn-sm btn-outline">Download</a>
               {% if current_user.role == 'admin' %}<form method="post" action="{{ url_for('document_delete', did=d.id) }}" style="display:inline" onsubmit="return confirm('Delete this document?')"><button class="btn btn-sm btn-danger">Delete</button></form>{% endif %}</td></tr>
         {% else %}<tr><td class="empty">No documents yet.</td></tr>{% endfor %}
