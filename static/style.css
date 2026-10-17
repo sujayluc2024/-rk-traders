@@ -249,3 +249,7 @@ table.activity tr.failed td { background: #fff1f2; }
 
 .branch-sig { border-top: 1px solid var(--border); padding: 10px 0; }
 .branch-sig summary { cursor: pointer; color: var(--primary); font-size: 13px; margin-top: 4px; }
+
+/* ---------------- Login background ---------------- */
+.login-wrap.has-bg { background-size: cover; background-position: center; background-attachment: fixed; }
+.login-wrap.has-bg .login-box { background: rgba(255,255,255,.96); box-shadow: 0 20px 60px rgba(0,0,0,.35); }

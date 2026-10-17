@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Login - {{ settings.shop_name }}{% endblock %}
-{% block container_class %}login-wrap{% endblock %}
+{% block container_class %}login-wrap{% if settings.login_bg_file %} has-bg{% endif %}{% endblock %}
+{% block head %}{% if settings.login_bg_file %}<style>.login-wrap.has-bg { background-image: linear-gradient(rgba(11,26,77,.55), rgba(11,26,77,.55)), url("{{ url_for('login_bg_image') }}?v={{ settings.login_bg_file }}"); }</style>{% endif %}{% endblock %}
 {% block content %}
 <div class="login-box">
   <img src="{{ url_for('static', filename='logo.svg') }}" alt="{{ settings.shop_name }}" class="login-logo">

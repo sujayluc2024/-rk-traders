@@ -120,6 +120,7 @@ def init_db():
         "id_card_validity_years": "2",
         "signature_file": "",
         "signatory_name": "",
+        "login_bg_file": "",
         "offer_letter_template": (
             "Dear {name},\n\n"
             "We are pleased to offer you the position of {designation} at {company}, {branch}, with effect from {joining_date}.\n\n"
@@ -1471,6 +1472,23 @@ def settings_page():
             run("INSERT INTO settings(key,value) VALUES ('signature_file',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (fname,))
         if request.form.get("remove_signature"):
             run("UPDATE settings SET value='' WHERE key='signature_file'")
+        bg = request.files.get("login_bg")
+        if bg and bg.filename:
+            ext = bg.filename.rsplit(".", 1)[-1].lower() if "." in bg.filename else ""
+            if ext not in ("png", "jpg", "jpeg", "webp"):
+                flash("Login background must be a JPG, PNG or WEBP image.", "error")
+                return redirect(url_for("settings_page"))
+            os.makedirs(os.path.join(BASE_DIR, "uploads"), exist_ok=True)
+            for old in ("login_bg.png", "login_bg.jpg", "login_bg.jpeg", "login_bg.webp"):
+                try:
+                    os.remove(os.path.join(BASE_DIR, "uploads", old))
+                except OSError:
+                    pass
+            fname = f"login_bg.{ext}"
+            bg.save(os.path.join(BASE_DIR, "uploads", fname))
+            run("INSERT INTO settings(key,value) VALUES ('login_bg_file',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (fname,))
+        if request.form.get("remove_login_bg"):
+            run("UPDATE settings SET value='' WHERE key='login_bg_file'")
         for k in ["shop_name", "shop_tagline", "shop_address", "shop_phone", "shop_gstin", "state_name", "state_code", "invoice_footer",
                   "offer_letter_template", "emp_id_prefix", "designations", "id_card_validity_years", "signatory_name"]:
             run("INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
@@ -1550,6 +1568,16 @@ def signature_generate():
     get_db().commit()
     flash(f"Digital signature created for {name}. It now prints on all documents.", "success")
     return redirect(url_for("settings_page"))
+
+
+@app.route("/login-bg")
+def login_bg_image():
+    """Login page background (public, since the login page is shown before signing in)."""
+    f = get_setting("login_bg_file", "")
+    path = os.path.join(BASE_DIR, "uploads", f) if f else ""
+    if not f or not os.path.exists(path):
+        abort(404)
+    return send_from_directory(os.path.dirname(path), os.path.basename(path), max_age=3600)
 
 
 @app.route("/signature")
@@ -2474,7 +2502,8 @@ ACTION_LABELS = {
     "sales_export": "Exported bills register", "receipts_export": "Exported receipts", "stock_export": "Exported stock list",
     "customers_export": "Exported customer list",
 }
-SKIP_ENDPOINTS = {"static", "api_product_search", "api_customer_search", "api_notices_unread", "api_branch_stock", "notice_mark_read", "signature_preview"}
+SKIP_ENDPOINTS = {"static", "api_product_search", "api_customer_search", "api_notices_unread", "api_branch_stock", "notice_mark_read", "signature_preview",
+                  "login_bg_image"}
 LOGGED_GETS = {"logout", "switch_branch", "report_export", "audit_export", "activity_export", "sales_export", "receipts_export",
                "stock_export", "customers_export", "document_view", "purchase_bill", "document_signed"}
 SECRET_KEYS = ("password", "old", "new", "confirm")

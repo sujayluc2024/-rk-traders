@@ -27,6 +27,13 @@
       <div class="field"><label>ID card validity (years)</label><input type="number" min="1" max="10" name="id_card_validity_years" value="{{ settings.id_card_validity_years }}"></div>
     </div>
     <div class="field"><label>Designations (comma separated)</label><input type="text" name="designations" value="{{ settings.designations }}"></div>
+    <h2 style="margin-top:18px">Login page background</h2>
+    <div class="row">
+      <div class="field">{% if settings.login_bg_file %}<img src="{{ url_for('login_bg_image') }}?v={{ settings.login_bg_file }}" alt="login background" style="max-height:110px;max-width:100%;border-radius:8px;border:1px solid var(--border)"><br>
+        <label class="checkbox" style="margin-top:6px"><input type="checkbox" name="remove_login_bg" value="1"> Remove background (plain colour)</label>{% else %}<span class="hint">No image set. The login page uses a plain colour.</span>{% endif %}</div>
+      <div class="field"><label>Upload background image (JPG, PNG or WEBP, up to 5 MB, landscape works best)</label><input type="file" name="login_bg" accept=".jpg,.jpeg,.png,.webp"></div>
+    </div>
+    <p class="hint">Shown full screen behind the login box with a soft dark tint so the form stays readable.</p>
     <h2 style="margin-top:18px">Authorised signature</h2>
     <div class="row">
       <div class="field">{% if settings.signature_file %}<img src="{{ url_for('signature_image') }}" alt="signature" style="max-height:70px;border:1px solid var(--border);padding:6px;background:#fff"><br>
