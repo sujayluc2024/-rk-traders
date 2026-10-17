@@ -5,6 +5,11 @@
 <div class="card">
   <p><strong>Date:</strong> {{ p.date }} &nbsp; <strong>Supplier:</strong> {{ p.supplier or '-' }} {{ p.supplier_phone }} &nbsp; <strong>Supplier bill no:</strong> {{ p.invoice_no or '-' }}</p>
   {% if p.note %}<p><strong>Note:</strong> {{ p.note }}</p>{% endif %}
+  <p><strong>Supplier bill:</strong> {% if p.bill_file %}<a href="{{ url_for('purchase_bill', pid=p.id) }}" target="_blank">&#128206; {{ p.bill_name }}</a>{% else %}<span class="hint">not attached</span>{% endif %}</p>
+  <form method="post" action="{{ url_for('purchase_bill', pid=p.id) }}" enctype="multipart/form-data" class="inline-form" style="margin-bottom:12px">
+    <div class="field"><input type="file" name="bill" accept=".pdf,.jpg,.jpeg,.png" required></div>
+    <button class="btn btn-sm btn-outline">{{ 'Replace bill' if p.bill_file else 'Attach bill' }}</button>
+  </form>
   <table>
     <tr><th>Item</th><th class="num">Qty</th><th class="num">Unit cost</th><th class="num">Total</th></tr>
     {% for i in items %}<tr><td>{{ i.name }}</td><td class="num">{{ i.quantity|qty }} {{ i.unit }}</td><td class="num">{{ i.unit_cost|inr }}</td><td class="num">{{ i.total|inr }}</td></tr>{% endfor %}

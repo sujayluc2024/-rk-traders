@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8">
 <title>Receipt {{ p.receipt_no }}</title>
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo-mark.svg') }}">
 <style>
+  .shop { display: flex; gap: 12px; align-items: flex-start; }
+  .shop img { width: 58px; height: 58px; flex: none; }
   @page { size: A4; margin: 12mm; }
   body { font-family: "Segoe UI", Arial, sans-serif; color: #000; font-size: 13px; margin: 0; background: #e9ecef; }
   .sheet { width: 210mm; margin: 16px auto; background: #fff; padding: 14mm; box-sizing: border-box; }
@@ -40,11 +43,14 @@
 <div class="sheet">
   <div class="head">
     <div class="shop">
+      <img src="{{ url_for('static', filename='logo-mark.svg') }}" alt="">
+      <div>
       <h1>{{ settings.shop_name }}</h1>
       <p>{{ settings.shop_tagline }}</p>
       <p>{{ p.branch_address or settings.shop_address }}</p>
       {% if p.branch_phone or settings.shop_phone %}<p>Phone: {{ p.branch_phone or settings.shop_phone }}</p>{% endif %}
       {% if p.branch_gstin or settings.shop_gstin %}<p><strong>GSTIN: {{ p.branch_gstin or settings.shop_gstin }}</strong></p>{% endif %}
+      </div>
     </div>
     <div class="meta">
       <h2>PAYMENT RECEIPT</h2>

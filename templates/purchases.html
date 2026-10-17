@@ -3,9 +3,9 @@
 {% block content %}
 <div class="toolbar"><h1>Purchases <small class="hint">{{ current_branch.name }}</small></h1><a href="{{ url_for('purchase_new') }}" class="btn">+ New Purchase</a></div>
 <div class="card table-wrap"><table>
-  <tr><th>#</th><th>Date</th><th>Supplier</th><th>Supplier bill no</th><th class="num">Total</th><th>Entered by</th></tr>
+  <tr><th>#</th><th>Date</th><th>Supplier</th><th>Supplier bill no</th><th>Bill copy</th><th class="num">Total</th><th>Entered by</th></tr>
   {% for p in purchases %}
-  <tr><td><a href="{{ url_for('purchase_detail', pid=p.id) }}">P-{{ p.id }}</a></td><td>{{ p.date }}</td><td>{{ p.supplier or '-' }}</td><td>{{ p.invoice_no or '-' }}</td><td class="num">{{ p.total|inr }}</td><td>{{ p.user or '-' }}</td></tr>
-  {% else %}<tr><td colspan="6" class="empty">No purchases recorded yet.</td></tr>{% endfor %}
+  <tr><td><a href="{{ url_for('purchase_detail', pid=p.id) }}">P-{{ p.id }}</a></td><td>{{ p.date }}</td><td>{{ p.supplier or '-' }}</td><td>{{ p.invoice_no or '-' }}</td><td>{% if p.bill_file %}<a href="{{ url_for('purchase_bill', pid=p.id) }}" target="_blank">&#128206; View</a>{% else %}<span class="hint">-</span>{% endif %}</td><td class="num">{{ p.total|inr }}</td><td>{{ p.user or '-' }}</td></tr>
+  {% else %}<tr><td colspan="7" class="empty">No purchases recorded yet.</td></tr>{% endfor %}
 </table></div>
 {% endblock %}

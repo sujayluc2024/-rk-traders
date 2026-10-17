@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}My documents{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>My documents</h1></div>
+<div class="grid grid-3">
+  <div class="card">
+    <h2>My details</h2>
+    {% if p.photo %}<img src="{{ url_for('photo_file', fname=p.photo) }}" class="photo-lg">{% endif %}
+    <table>
+      <tr><td>Name</td><td><strong>{{ t.full_name }}</strong></td></tr>
+      <tr><td>Employee ID</td><td>{{ p.emp_code or '-' }}</td></tr>
+      <tr><td>Designation</td><td>{{ p.designation or '-' }}</td></tr>
+      <tr><td>Branch</td><td>{{ t.branch_name or 'All branches' }}</td></tr>
+      <tr><td>Joined</td><td>{{ t.joining_date or '-' }}</td></tr>
+      <tr><td>Phone</td><td>{{ p.phone or '-' }}</td></tr>
+    </table>
+    <p class="hint">If anything here is wrong, tell your manager or the admin.</p>
+  </div>
+  <div class="card table-wrap" style="grid-column: span 2">
+    <h2>Documents</h2>
+    <table>
+      <tr><th>Document</th><th>Type</th><th>Issued</th><th></th></tr>
+      {% for d in docs %}
+      <tr><td><a href="{{ url_for('document_view', did=d.id) }}" target="_blank"><strong>{{ d.title }}</strong></a></td>
+          <td><span class="tag {{ 'cash' if d.kind=='salary_slip' else ('upi' if d.kind=='id_card' else '') }}">{{ {'offer_letter':'Offer letter','id_card':'ID card','salary_slip':'Salary slip'}[d.kind] }}</span></td>
+          <td>{{ d.created_at }}</td>
+          <td style="white-space:nowrap"><a href="{{ url_for('document_view', did=d.id) }}" target="_blank" class="btn btn-sm btn-outline">View / Print</a> <a href="{{ url_for('document_view', did=d.id, download=1) }}" class="btn btn-sm btn-outline">Download</a></td></tr>
+      {% else %}<tr><td colspan="4" class="empty">No documents issued to you yet.</td></tr>{% endfor %}
+    </table>
+  </div>
+</div>
+{% endblock %}

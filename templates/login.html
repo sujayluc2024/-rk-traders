@@ -3,8 +3,7 @@
 {% block container_class %}login-wrap{% endblock %}
 {% block content %}
 <div class="login-box">
-  <h1>{{ settings.shop_name }}</h1>
-  <p class="sub">{{ settings.shop_tagline }}</p>
+  <img src="{{ url_for('static', filename='logo.svg') }}" alt="{{ settings.shop_name }}" class="login-logo">
   <form method="post">
     <div class="field"><label>Username</label><input type="text" name="username" required autofocus></div>
     <div class="field"><label>Password</label><input type="password" name="password" required></div>

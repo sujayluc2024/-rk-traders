@@ -227,3 +227,15 @@ table.activity tr.failed td { background: #fff1f2; }
 .offer-cell { font-size: 12px; max-width: 140px; }
 .totals .offer-line { color: #166534; font-weight: 600; }
 .totals .offer-line small { font-weight: normal; color: var(--muted); }
+
+/* ---------------- HR ---------------- */
+.avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; display: inline-block; }
+.avatar.ph { background: #e6f4f1; color: var(--primary-dark); text-align: center; line-height: 34px; font-weight: 700; }
+.photo-lg { width: 100px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); display: block; }
+.photo-lg.ph { background: #f1f5f9; color: var(--muted); display: flex; align-items: center; justify-content: center; font-size: 12px; }
+
+/* ---------------- Logo ---------------- */
+.brand-logo { width: 34px; height: 34px; vertical-align: middle; margin-right: 10px; border-radius: 9px; background: #fff; }
+.sidebar .brand { display: flex; align-items: center; }
+.nav-collapsed .brand-logo { margin-right: 0; }
+.login-logo { display: block; width: 100%; max-width: 300px; margin: 0 auto 22px; }

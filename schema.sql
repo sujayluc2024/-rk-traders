@@ -303,3 +303,36 @@ CREATE TABLE IF NOT EXISTS offers (
     created_by  INTEGER REFERENCES users(id),
     created_at  TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
+
+-- HR: staff profile and generated documents
+CREATE TABLE IF NOT EXISTS staff_profiles (
+    user_id           INTEGER PRIMARY KEY REFERENCES users(id),
+    emp_code          TEXT,
+    designation       TEXT,
+    phone             TEXT,
+    address           TEXT,
+    dob               TEXT,
+    blood_group       TEXT,
+    photo             TEXT,                       -- file in uploads/photos
+    monthly_salary    REAL NOT NULL DEFAULT 0,
+    hra               REAL NOT NULL DEFAULT 0,
+    allowances        REAL NOT NULL DEFAULT 0,
+    bank_name         TEXT,
+    account_no        TEXT,
+    ifsc              TEXT,
+    pan               TEXT,
+    emergency_contact TEXT,
+    updated_at        TEXT
+);
+
+CREATE TABLE IF NOT EXISTS staff_documents (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    kind       TEXT NOT NULL,                     -- offer_letter | id_card | salary_slip
+    title      TEXT NOT NULL,
+    period     TEXT,                              -- YYYY-MM for salary slips
+    file       TEXT NOT NULL,                     -- pdf in uploads/docs
+    data       TEXT,                              -- JSON snapshot of the figures used
+    created_by INTEGER REFERENCES users(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);

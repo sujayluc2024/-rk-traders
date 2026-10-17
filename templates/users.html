@@ -7,7 +7,7 @@
     <table><tr><th>Username</th><th>Name</th><th>Role</th><th>Branch</th><th>Joined</th><th>Device</th><th></th></tr>
     {% for u in users %}
     <tr><td><strong>{{ u.username }}</strong>{% if not u.active %} <span class="tag">inactive</span>{% endif %}</td><td>{{ u.full_name }}</td>
-        <td><span class="tag">{{ u.role }}</span>{% if u.can_manage_users %}<br><small class="hint">can add cashiers</small>{% endif %}{% if u.can_view_analytics %}<br><small class="hint">analytics access</small>{% endif %}{% if u.can_reset_device %}<br><small class="hint">can reset devices</small>{% endif %}</td>
+        <td><span class="tag">{{ u.role }}</span>{% if u.can_manage_users %}<br><small class="hint">can add cashiers</small>{% endif %}{% if u.can_view_analytics %}<br><small class="hint">analytics access</small>{% endif %}{% if u.can_reset_device %}<br><small class="hint">can reset devices</small>{% endif %}{% if u.can_hr_docs %}<br><small class="hint">HR documents</small>{% endif %}</td>
         <td>{{ u.branch_name or 'All branches' }}</td><td>{{ u.joining_date or '-' }}</td>
         <td>{% if not u.device_lock %}<span class="hint">not locked</span>{% elif u.bound_ip %}<span class="tag cash" title="since {{ u.bound_at }}">{{ u.bound_ip }}</span>
             {% if can_reset_device %}<form method="post" action="{{ url_for('user_reset_device', uid=u.id) }}" style="display:inline" onsubmit="return confirm('Reset device for {{ u.full_name }}? Their next login will register a new device.')"><button class="btn-link" style="font-size:12px">reset</button></form>{% endif %}
@@ -31,7 +31,8 @@
           <select name="branch_id" id="u_branch">{% for b in branches %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}</select></div>
       </div>
       <div class="field" id="u_manage_wrap" style="display:none"><label class="checkbox"><input type="checkbox" name="can_manage_users" id="u_can_manage"> Allow this manager to create and edit cashier users of their branch</label>
-        <label class="checkbox"><input type="checkbox" name="can_reset_device" id="u_can_reset"> Allow this manager to reset device locks of their branch cashiers</label></div>
+        <label class="checkbox"><input type="checkbox" name="can_reset_device" id="u_can_reset"> Allow this manager to reset device locks of their branch cashiers</label>
+        <label class="checkbox"><input type="checkbox" name="can_hr_docs" id="u_can_hr"> Allow this manager to manage HR documents (offer letter, ID card, salary slip) of their branch cashiers</label></div>
       <div class="field" id="u_analytics_wrap"><label class="checkbox"><input type="checkbox" name="can_view_analytics" id="u_can_analytics"> Allow access to the Analytics dashboard (own branch for managers and cashiers)</label></div>
       {% endif %}
       <div class="row">
@@ -67,6 +68,7 @@ function editUser(u) {
     if (u.branch_id) document.getElementById('u_branch').value = u.branch_id;
     document.getElementById('u_can_manage').checked = !!u.can_manage_users;
     document.getElementById('u_can_reset').checked = !!u.can_reset_device;
+    document.getElementById('u_can_hr').checked = !!u.can_hr_docs;
     document.getElementById('u_can_analytics').checked = !!u.can_view_analytics;
     roleChanged();
   }

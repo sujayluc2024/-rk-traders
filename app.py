@@ -76,10 +76,11 @@ def migrate(db):
     wanted["sales"].append(("offer_discount", "REAL NOT NULL DEFAULT 0"))
     wanted["sale_items"] = [("offer_name", "TEXT"), ("offer_discount", "REAL NOT NULL DEFAULT 0")]
     wanted.pop("sales_extra")
+    wanted["purchases"] = [("bill_file", "TEXT"), ("bill_name", "TEXT")]
     wanted["users"] = [("joining_date", "TEXT"), ("can_manage_users", "INTEGER NOT NULL DEFAULT 0"),
                        ("can_view_analytics", "INTEGER NOT NULL DEFAULT 0"),
                        ("device_lock", "INTEGER NOT NULL DEFAULT 1"), ("bound_ip", "TEXT"), ("bound_at", "TEXT"),
-                       ("can_reset_device", "INTEGER NOT NULL DEFAULT 0")]
+                       ("can_reset_device", "INTEGER NOT NULL DEFAULT 0"), ("can_hr_docs", "INTEGER NOT NULL DEFAULT 0")]
     for table, cols in wanted.items():
         have = {r[1] for r in db.execute(f"PRAGMA table_info({table})")}
         for name, ddl in cols:
@@ -112,6 +113,13 @@ def init_db():
         "state_code": "19",
         "invoice_footer": "Thank you for shopping with us! Goods once sold will not be taken back.",
         "allow_negative_stock": "0",
+        "offer_letter_template": (
+            "Dear {name},\n\n"
+            "We are pleased to offer you the position of {designation} at {company}, {branch}, with effect from {joining_date}.\n\n"
+            "Your monthly salary will be Rs. {salary} ({salary_words} only), payable at the end of each month. Your working hours, "
+            "leave entitlement and other service conditions will be as per the policies of {company}, as amended from time to time.\n\n"
+            "Please sign and return a copy of this letter as a token of your acceptance. We look forward to having you on our team.\n\n"
+            "Yours sincerely,"),
     }
     for k, v in defaults.items():
         db.execute("INSERT OR IGNORE INTO settings(key,value) VALUES (?,?)", (k, v))
@@ -233,6 +241,8 @@ def inject_globals():
         ctx["can_view_analytics"] = ctx["current_user"] and (ctx["current_user"]["role"] == "admin" or ctx["current_user"]["can_view_analytics"])
         ctx["can_reset_device"] = ctx["current_user"] and (ctx["current_user"]["role"] == "admin" or
                                                           (ctx["current_user"]["role"] == "manager" and ctx["current_user"]["can_reset_device"]))
+        ctx["can_hr_docs"] = ctx["current_user"] and (ctx["current_user"]["role"] == "admin" or
+                                                     (ctx["current_user"]["role"] == "manager" and ctx["current_user"]["can_hr_docs"]))
     return ctx
 
 
@@ -742,18 +752,49 @@ def purchases():
     return render_template("purchases.html", purchases=rows)
 
 
+PURCHASE_BILL_DIR = os.path.join(BASE_DIR, "uploads", "purchases")
+
+
+def save_purchase_bill(file):
+    """Store an uploaded supplier bill (PDF/JPG/PNG). Returns (stored_name, original_name) or (None, None)."""
+    if not file or not file.filename:
+        return None, None
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if ext not in ALLOWED_DOCS:
+        raise ValueError("Supplier bill must be a PDF, JPG or PNG file.")
+    os.makedirs(PURCHASE_BILL_DIR, exist_ok=True)
+    stored = f"bill_{int(datetime.now().timestamp())}_{secure_filename(file.filename)[:60]}"
+    file.save(os.path.join(PURCHASE_BILL_DIR, stored))
+    return stored, file.filename
+
+
 @app.route("/purchases/new", methods=["GET", "POST"])
 @role_required("admin", "manager")
 def purchase_new():
     if request.method == "POST":
-        data = request.get_json(force=True)
+        if request.is_json:
+            data = request.get_json(force=True)
+            bill_file = request.files.get("bill")
+        else:                                            # multipart from the form (items as JSON text + optional bill file)
+            data = dict(request.form)
+            try:
+                data["items"] = json.loads(request.form.get("items") or "[]")
+            except ValueError:
+                return jsonify(ok=False, error="Bad item data."), 400
+            bill_file = request.files.get("bill")
         items = [i for i in data.get("items", []) if i.get("product_id") and float(i.get("quantity") or 0) > 0]
         if not items:
             return jsonify(ok=False, error="Add at least one item."), 400
+        try:
+            stored, orig = save_purchase_bill(bill_file)
+        except ValueError as e:
+            return jsonify(ok=False, error=str(e)), 400
+        if not stored:
+            return jsonify(ok=False, error="Please attach the supplier's bill (PDF or photo). A purchase cannot be saved without it."), 400
         total = sum(float(i["quantity"]) * float(i["unit_cost"]) for i in items)
-        pid = run("INSERT INTO purchases(branch_id,supplier_id,invoice_no,date,total,note,created_by) VALUES (?,?,?,?,?,?,?)",
+        pid = run("INSERT INTO purchases(branch_id,supplier_id,invoice_no,date,total,note,created_by,bill_file,bill_name) VALUES (?,?,?,?,?,?,?,?,?)",
                   (branch_id(), data.get("supplier_id") or None, data.get("invoice_no", ""),
-                   data.get("date") or date.today().isoformat(), total, data.get("note", ""), session["user_id"]))
+                   data.get("date") or date.today().isoformat(), total, data.get("note", ""), session["user_id"], stored, orig))
         for i in items:
             qty, cost = float(i["quantity"]), float(i["unit_cost"])
             run("INSERT INTO purchase_items(purchase_id,product_id,quantity,unit_cost,total) VALUES (?,?,?,?,?)",
@@ -766,6 +807,33 @@ def purchase_new():
         get_db().commit()
         return jsonify(ok=True, id=pid)
     return render_template("purchase_form.html", suppliers=q("SELECT * FROM suppliers ORDER BY name"))
+
+
+@app.route("/purchases/<int:pid>/bill", methods=["GET", "POST"])
+@role_required("admin", "manager")
+def purchase_bill(pid):
+    p = q("SELECT * FROM purchases WHERE id=?", (pid,), one=True) or abort(404)
+    if request.method == "POST":
+        try:
+            stored, orig = save_purchase_bill(request.files.get("bill"))
+        except ValueError as e:
+            flash(str(e), "error")
+            return redirect(url_for("purchase_detail", pid=pid))
+        if not stored:
+            flash("Choose a file first.", "error")
+            return redirect(url_for("purchase_detail", pid=pid))
+        if p["bill_file"]:
+            try:
+                os.remove(os.path.join(PURCHASE_BILL_DIR, p["bill_file"]))
+            except OSError:
+                pass
+        run("UPDATE purchases SET bill_file=?, bill_name=? WHERE id=?", (stored, orig, pid))
+        get_db().commit()
+        flash("Supplier bill attached.", "success")
+        return redirect(url_for("purchase_detail", pid=pid))
+    if not p["bill_file"]:
+        abort(404)
+    return send_from_directory(PURCHASE_BILL_DIR, p["bill_file"], as_attachment=False, download_name=p["bill_name"])
 
 
 @app.route("/purchases/<int:pid>")
@@ -1219,9 +1287,14 @@ def export_response(title, period, rows, fmt, columns=None, filename="report"):
         h1 = ParagraphStyle("h1", parent=ss["Title"], fontName=bold, fontSize=16, alignment=0, spaceAfter=2)
         small = ParagraphStyle("small", parent=ss["Normal"], fontName=font, fontSize=9, leading=11)
         bsty = ParagraphStyle("b", parent=small, fontName=bold)
-        story = [Paragraph(company[0], h1)]
-        for line in company[1:]:
-            story.append(Paragraph(line, small))
+        head = [Paragraph(company[0], h1)] + [Paragraph(line, small) for line in company[1:]]
+        logo = logo_drawing(40)
+        if logo:
+            lt = Table([[logo, head]], colWidths=[48, None])
+            lt.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 0)]))
+            story = [lt]
+        else:
+            story = head
         for line in branch:
             story.append(Paragraph(line, bsty if line.startswith("Branch:") else small))
         story.append(Spacer(1, 4))
@@ -1368,7 +1441,8 @@ def report_export():
 @role_required("admin")
 def settings_page():
     if request.method == "POST":
-        for k in ["shop_name", "shop_tagline", "shop_address", "shop_phone", "shop_gstin", "state_name", "state_code", "invoice_footer"]:
+        for k in ["shop_name", "shop_tagline", "shop_address", "shop_phone", "shop_gstin", "state_name", "state_code", "invoice_footer",
+                  "offer_letter_template"]:
             run("INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (k, request.form.get(k, "").strip()))
         run("INSERT INTO settings(key,value) VALUES ('allow_negative_stock',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
@@ -1436,10 +1510,11 @@ def users():
             can_analytics = 1 if (role != "admin" and f.get("can_view_analytics")) else 0
             device_lock = 1 if f.get("device_lock") else 0
             can_reset = 1 if (role == "manager" and f.get("can_reset_device")) else 0
+            can_hr = 1 if (role == "manager" and f.get("can_hr_docs")) else 0
         else:                                   # manager: cashiers of own branch only
             role, bid, can_manage, can_analytics = "cashier", u["branch_id"], 0, 0
             device_lock = 1 if f.get("device_lock", "1") else 0
-            can_reset = 0
+            can_reset = can_hr = 0
         joining = f.get("joining_date") or None
         try:
             if f.get("id"):
@@ -1448,17 +1523,17 @@ def users():
                     flash("You can only edit cashiers of your own branch.", "error")
                     return redirect(url_for("users"))
                 run("UPDATE users SET full_name=?,role=?,branch_id=?,active=?,joining_date=?,can_manage_users=?,can_view_analytics=?,device_lock=?,"
-                    "can_reset_device=? WHERE id=?",
-                    (f["full_name"].strip(), role, bid, 1 if f.get("active") else 0, joining, can_manage, can_analytics, device_lock, can_reset, f["id"]))
+                    "can_reset_device=?,can_hr_docs=? WHERE id=?",
+                    (f["full_name"].strip(), role, bid, 1 if f.get("active") else 0, joining, can_manage, can_analytics, device_lock, can_reset, can_hr, f["id"]))
                 if not device_lock:
                     run("UPDATE users SET bound_ip=NULL, bound_at=NULL WHERE id=?", (f["id"],))   # lock off = forget the device
                 if f.get("password"):
                     run("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(f["password"]), f["id"]))
             else:
                 run("INSERT INTO users(username,password_hash,full_name,role,branch_id,joining_date,can_manage_users,can_view_analytics,device_lock,"
-                    "can_reset_device) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    "can_reset_device,can_hr_docs) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                     (f["username"].strip().lower(), generate_password_hash(f["password"]), f["full_name"].strip(), role, bid, joining, can_manage,
-                     can_analytics, device_lock, can_reset))
+                     can_analytics, device_lock, can_reset, can_hr))
             get_db().commit()
             flash("User saved.", "success")
         except sqlite3.IntegrityError:
@@ -2230,14 +2305,16 @@ ACTION_LABELS = {
     "message_send_stock": "Sent stock for request", "message_status": "Changed request status",
     "leave_new": "Applied for leave", "leave_decide": "Decided leave", "leave_cancel": "Withdrew leave",
     "leave_document": "Leave document", "award_give": "Gave award", "award_delete": "Removed award",
-    "user_reset_device": "Reset device lock", "offer_form": "Saved offer", "offer_toggle": "Switched offer on/off", "offer_delete": "Deleted offer",
+    "user_reset_device": "Reset device lock", "offer_form": "Saved offer",
+    "purchase_bill": "Supplier bill", "hr_staff": "Saved staff profile", "hr_offer_letter": "Generated offer letter", "hr_id_card": "Generated ID card",
+    "hr_salary_slip": "Generated salary slip", "document_view": "Viewed staff document", "document_delete": "Deleted staff document", "offer_toggle": "Switched offer on/off", "offer_delete": "Deleted offer",
     "report_export": "Exported report", "audit_export": "Exported login audit", "activity_export": "Exported activity log",
     "sales_export": "Exported bills register", "receipts_export": "Exported receipts", "stock_export": "Exported stock list",
     "customers_export": "Exported customer list",
 }
 SKIP_ENDPOINTS = {"static", "api_product_search", "api_customer_search", "api_notices_unread", "api_branch_stock", "notice_mark_read"}
 LOGGED_GETS = {"logout", "switch_branch", "report_export", "audit_export", "activity_export", "sales_export", "receipts_export",
-               "stock_export", "customers_export"}
+               "stock_export", "customers_export", "document_view", "purchase_bill"}
 SECRET_KEYS = ("password", "old", "new", "confirm")
 
 
@@ -2287,6 +2364,8 @@ def record_activity(response):
             action = "Login" if response.status_code == 302 else ("Login BLOCKED (device)" if getattr(g, "audit_note", "").startswith("Device lock") else "Login FAILED")
         elif ep == "leave_document":
             action = "Uploaded leave document" if request.method == "POST" else "Viewed leave document"
+        elif ep == "purchase_bill":
+            action = "Attached supplier bill" if request.method == "POST" else "Viewed supplier bill"
         elif ep == "users" and not request.form.get("id"):
             action = "Created user"
         elif ep == "leave_decide":
@@ -2546,6 +2625,480 @@ def analytics():
     data = analytics_data(f, t, pf, pt, bid)
     return render_template("analytics.html", d=data, period=key, date_from=f, date_to=t, prev_from=pf, prev_to=pt, bid=bid,
                            branches_list=q("SELECT * FROM branches WHERE active=1 ORDER BY name"), data_json=json.dumps(data, default=str))
+
+# --------------------------------------------------------------------------
+# HR: staff profiles, offer letters, ID cards, salary slips
+# --------------------------------------------------------------------------
+DOC_DIR = os.path.join(BASE_DIR, "uploads", "docs")
+PHOTO_DIR = os.path.join(BASE_DIR, "uploads", "photos")
+MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+
+
+def hr_can_manage(u, target):
+    if u["role"] == "admin":
+        return True
+    return bool(u["role"] == "manager" and u["can_hr_docs"] and target["role"] == "cashier" and target["branch_id"] == u["branch_id"])
+
+
+def hr_user(uid):
+    return q("SELECT u.*, b.name AS branch_name, b.address AS branch_address, b.phone AS branch_phone FROM users u "
+             "LEFT JOIN branches b ON b.id=u.branch_id WHERE u.id=?", (uid,), one=True)
+
+
+def profile_of(uid):
+    r = q("SELECT * FROM staff_profiles WHERE user_id=?", (uid,), one=True)
+    return dict(r) if r else {"user_id": uid, "monthly_salary": 0, "hra": 0, "allowances": 0}
+
+
+def _pdf_fonts():
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    try:
+        if "Arial" not in pdfmetrics.getRegisteredFontNames():
+            pdfmetrics.registerFont(TTFont("Arial", r"C:\Windows\Fonts\arial.ttf"))
+            pdfmetrics.registerFont(TTFont("Arial-Bold", r"C:\Windows\Fonts\arialbd.ttf"))
+        return "Arial", "Arial-Bold"
+    except Exception:
+        return "Helvetica", "Helvetica-Bold"
+
+
+def _save_doc(uid, kind, title, period, pdf_bytes, data):
+    os.makedirs(DOC_DIR, exist_ok=True)
+    fname = f"{kind}_{uid}_{int(datetime.now().timestamp())}.pdf"
+    with open(os.path.join(DOC_DIR, fname), "wb") as fh:
+        fh.write(pdf_bytes)
+    did = run("INSERT INTO staff_documents(user_id,kind,title,period,file,data,created_by) VALUES (?,?,?,?,?,?,?)",
+              (uid, kind, title, period, fname, json.dumps(data, default=str), session["user_id"]))
+    notify([uid], f"New document: {title}", "Open My documents in the menu to view or print it.", session["user_id"])
+    get_db().commit()
+    return did
+
+
+def logo_drawing(size_pt=42):
+    """The RK logo mark as a reportlab drawing (None if it cannot be loaded)."""
+    try:
+        from svglib.svglib import svg2rlg
+        d = svg2rlg(os.path.join(BASE_DIR, "static", "logo-mark.svg"))
+        k = size_pt / 64.0
+        d.scale(k, k)
+        d.width, d.height = size_pt, size_pt
+        return d
+    except Exception:
+        return None
+
+
+def _company_header(story, styles, font, bold):
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import ParagraphStyle
+    st = all_settings()
+    name = Paragraph(st.get("shop_name", ""), ParagraphStyle("c1", fontName=bold, fontSize=18, leading=22))
+    sub = " | ".join(x for x in [st.get("shop_tagline"), st.get("shop_address"), ("Phone: " + st["shop_phone"]) if st.get("shop_phone") else "",
+                                 ("GSTIN: " + st["shop_gstin"]) if st.get("shop_gstin") else ""] if x)
+    subp = Paragraph(sub, ParagraphStyle("c2", fontName=font, fontSize=9, textColor="#444444", leading=12))
+    logo = logo_drawing(42)
+    if logo:
+        t = Table([[logo, [name, subp]]], colWidths=[50, None])
+        t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 0)]))
+        story.append(t)
+    else:
+        story += [name, subp]
+    story.append(Spacer(1, 10))
+
+
+def build_offer_letter(user, prof):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+    font, bold = _pdf_fonts()
+    st = all_settings()
+    salary = float(prof.get("monthly_salary") or 0) + float(prof.get("hra") or 0) + float(prof.get("allowances") or 0)
+    fields = {"name": user["full_name"], "designation": prof.get("designation") or user["role"].title(), "branch": user["branch_name"] or "Head Office",
+              "joining_date": user["joining_date"] or date.today().isoformat(), "salary": inr(salary, symbol=False),
+              "salary_words": number_to_words(salary), "company": st.get("shop_name", ""), "date": date.today().strftime("%d %B %Y")}
+    body = st.get("offer_letter_template", "")
+    for k, v in fields.items():
+        body = body.replace("{" + k + "}", str(v))
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=20 * mm, rightMargin=20 * mm, topMargin=18 * mm, bottomMargin=18 * mm, title="Offer Letter")
+    normal = ParagraphStyle("n", fontName=font, fontSize=11, leading=16)
+    story = []
+    _company_header(story, None, font, bold)
+    story.append(HRFlowable(width="100%", thickness=1))
+    story.append(Spacer(1, 14))
+    story.append(Paragraph(f"Date: {fields['date']}", normal))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph("To,<br/><b>" + fields["name"] + "</b><br/>" + (prof.get("address") or "").replace("\n", "<br/>"), normal))
+    story.append(Spacer(1, 12))
+    story.append(Paragraph("<b>Subject: Offer of Employment</b>", normal))
+    story.append(Spacer(1, 10))
+    for para in body.split("\n\n"):
+        story.append(Paragraph(para.replace("\n", "<br/>"), normal))
+        story.append(Spacer(1, 8))
+    story.append(Spacer(1, 30))
+    story.append(Paragraph(f"For <b>{fields['company']}</b><br/><br/><br/>______________________<br/>Authorised Signatory", normal))
+    story.append(Spacer(1, 30))
+    story.append(Paragraph("I accept the above offer.<br/><br/><br/>______________________<br/>" + fields["name"] + " &nbsp;&nbsp; Date: ___________", normal))
+    doc.build(story)
+    return buf.getvalue(), fields
+
+
+def build_id_card(user, prof):
+    """Portrait ID card (54 x 85.6 mm), front and back side by side on A4 with cut lines."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+    from reportlab.lib import colors
+    from reportlab.graphics import renderPDF
+    font, bold = _pdf_fonts()
+    st = all_settings()
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    c.setTitle("ID Card")
+    W, H = 54 * mm, 85.6 * mm
+    teal, teal_dark, orange = colors.HexColor("#0f766e"), colors.HexColor("#0b5c56"), colors.HexColor("#f59e0b")
+    valid = (date.today().replace(year=date.today().year + 2)).strftime("%m/%Y")
+    emp = prof.get("emp_code") or f"EMP{user['id']:04d}"
+    company = st.get("shop_name", "")
+
+    def rounded_card(x, y):
+        c.setDash(3, 3); c.setStrokeColor(colors.grey); c.setLineWidth(0.5)
+        c.roundRect(x, y, W, H, 3 * mm); c.setDash(); c.setLineWidth(1)
+
+    def header(x, y, title):
+        c.setFillColor(teal); c.roundRect(x, y + H - 17 * mm, W, 17 * mm, 3 * mm, fill=1, stroke=0)
+        c.rect(x, y + H - 17 * mm, W, 6 * mm, fill=1, stroke=0)          # square off the bottom edge of the band
+        logo = logo_drawing(11 * mm)
+        if logo:
+            renderPDF.draw(logo, c, x + 3 * mm, y + H - 14.5 * mm)
+        c.setFillColor(colors.white)
+        c.setFont(bold, 9.5 if len(company) <= 14 else 8); c.drawString(x + 16 * mm, y + H - 8.5 * mm, company[:22])
+        c.setFont(font, 5.5); c.drawString(x + 16 * mm, y + H - 12 * mm, (title or st.get("shop_tagline") or "")[:34])
+        c.setFillColor(orange); c.rect(x, y + H - 17.8 * mm, W, 0.8 * mm, fill=1, stroke=0)
+
+    def fit(text, size, maxw):
+        while size > 5 and c.stringWidth(text, bold, size) > maxw:
+            size -= 0.5
+        return size
+
+    # ---------------- front ----------------
+    x0, y0 = 30 * mm, A4[1] - 30 * mm - H
+    c.setFillColor(colors.white); c.roundRect(x0, y0, W, H, 3 * mm, fill=1, stroke=0)
+    header(x0, y0, None)
+    # photo
+    pw, ph = 24 * mm, 26.5 * mm
+    px, py = x0 + (W - pw) / 2, y0 + H - 20 * mm - ph
+    c.setFillColor(colors.HexColor("#e6f4f1")); c.roundRect(px - 1.2 * mm, py - 1.2 * mm, pw + 2.4 * mm, ph + 2.4 * mm, 2 * mm, fill=1, stroke=0)
+    photo = os.path.join(PHOTO_DIR, prof["photo"]) if prof.get("photo") else None
+    drawn = False
+    if photo and os.path.exists(photo):
+        try:
+            c.drawImage(photo, px, py, pw, ph, preserveAspectRatio=True, anchor="c")
+            drawn = True
+        except Exception:
+            drawn = False
+    if not drawn:
+        c.setFillColor(colors.HexColor("#cbd5e1")); c.rect(px, py, pw, ph, fill=1, stroke=0)
+        c.setFillColor(colors.white); c.setFont(font, 7); c.drawCentredString(px + pw / 2, py + ph / 2 - 2, "PHOTO")
+    # name + designation
+    c.setFillColor(teal_dark)
+    name = user["full_name"]
+    c.setFont(bold, fit(name, 10.5, W - 6 * mm)); c.drawCentredString(x0 + W / 2, py - 5.5 * mm, name)
+    c.setFillColor(orange); c.setFont(bold, 6.5)
+    c.drawCentredString(x0 + W / 2, py - 9.5 * mm, (prof.get("designation") or user["role"].title()).upper()[:30])
+    # details
+    c.setFillColor(colors.black)
+    rows = [("ID", emp), ("Branch", user["branch_name"] or "Head Office"), ("Phone", prof.get("phone") or "-"),
+            ("Blood", prof.get("blood_group") or "-"), ("Joined", user["joining_date"] or "-")]
+    yy = py - 14 * mm
+    for n_, (k, v) in enumerate(rows):
+        c.setFont(bold, 6); c.drawString(x0 + 5 * mm, yy, k)
+        c.setFont(font, 6.3); c.drawString(x0 + 17 * mm, yy, str(v)[:26])
+        if n_ < len(rows) - 1:
+            c.setStrokeColor(colors.HexColor("#e5e7eb")); c.setLineWidth(0.3); c.line(x0 + 5 * mm, yy - 1.3 * mm, x0 + W - 5 * mm, yy - 1.3 * mm)
+        yy -= 4.2 * mm
+    # footer band
+    c.setFillColor(teal); c.rect(x0, y0, W, 6 * mm, fill=1, stroke=0)
+    c.setFillColor(colors.white); c.setFont(font, 5.5)
+    c.drawString(x0 + 3 * mm, y0 + 2.3 * mm, f"Valid till {valid}")
+    c.drawRightString(x0 + W - 3 * mm, y0 + 2.3 * mm, "Authorised Signatory")
+    rounded_card(x0, y0)
+
+    # ---------------- back ----------------
+    x1 = x0 + W + 20 * mm
+    c.setFillColor(colors.white); c.roundRect(x1, y0, W, H, 3 * mm, fill=1, stroke=0)
+    header(x1, y0, "EMPLOYEE IDENTITY CARD")
+    c.setFillColor(colors.black)
+    lines = [(bold, 6.3, "Terms of use"),
+             (font, 5.8, f"This card is the property of {company}."), (font, 5.8, "Carry it during duty hours and show it on request."),
+             (font, 5.8, "Return it when leaving service. Loss must be"), (font, 5.8, "reported to the manager immediately."),
+             (None, 0, ""),
+             (bold, 6.3, "Emergency contact"), (font, 5.8, (prof.get("emergency_contact") or "-")[:40]),
+             (None, 0, ""),
+             (bold, 6.3, "Holder's address"), (font, 5.8, (prof.get("address") or "-").replace("\n", ", ")[:44]),
+             (None, 0, ""),
+             (bold, 6.3, "If found, please return to"), (font, 5.8, (st.get("shop_address") or "")[:44]),
+             (font, 5.8, f"Phone: {st.get('shop_phone') or '-'}")]
+    yy = y0 + H - 23 * mm
+    for fnt, size, txt in lines:
+        if fnt:
+            c.setFont(fnt, size); c.drawString(x1 + 4 * mm, yy, txt)
+            yy -= 3.6 * mm
+        else:
+            yy -= 1.8 * mm
+    c.setFont(font, 5.5); c.drawString(x1 + 4 * mm, y0 + 9 * mm, "Holder's signature")
+    c.setStrokeColor(colors.black); c.setLineWidth(0.4); c.line(x1 + 4 * mm, y0 + 8 * mm, x1 + 30 * mm, y0 + 8 * mm)
+    c.setFillColor(teal); c.rect(x1, y0, W, 6 * mm, fill=1, stroke=0)
+    c.setFillColor(colors.white); c.setFont(font, 5.5); c.drawCentredString(x1 + W / 2, y0 + 2.3 * mm, f"ID {emp}  |  {company[:20]}")
+    rounded_card(x1, y0)
+
+    # labels and instructions
+    c.setFillColor(colors.grey); c.setFont(font, 8)
+    c.drawCentredString(x0 + W / 2, y0 - 6 * mm, "FRONT"); c.drawCentredString(x1 + W / 2, y0 - 6 * mm, "BACK")
+    c.drawString(30 * mm, y0 - 16 * mm, "Print at 100% scale on card stock or laminate. Standard card size 54 x 85.6 mm (portrait).")
+    c.drawString(30 * mm, y0 - 21 * mm, "Cut along the dashed lines and stick the two sides back to back.")
+    c.showPage(); c.save()
+    return buf.getvalue(), {"emp_code": emp, "valid_till": valid}
+
+
+def month_days(ym):
+    import calendar
+    y, m = int(ym[:4]), int(ym[5:7])
+    return calendar.monthrange(y, m)[1]
+
+
+def leave_days_in_month(uid, ym, unpaid=True):
+    """Approved leave days falling inside the month (Unpaid type only when unpaid=True, other types otherwise)."""
+    y, m = int(ym[:4]), int(ym[5:7])
+    first = date(y, m, 1)
+    last = date(y, m, month_days(ym))
+    rows = q("SELECT from_date, to_date, leave_type FROM leaves WHERE user_id=? AND status='approved' AND from_date<=? AND to_date>=?",
+             (uid, last.isoformat(), first.isoformat()))
+    total = 0
+    for r in rows:
+        if (r["leave_type"] == "Unpaid") != unpaid:
+            continue
+        a, b = max(date.fromisoformat(r["from_date"]), first), min(date.fromisoformat(r["to_date"]), last)
+        total += (b - a).days + 1
+    return total
+
+
+def build_salary_slip(user, prof, ym, fig):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    font, bold = _pdf_fonts()
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=16 * mm, rightMargin=16 * mm, topMargin=14 * mm, bottomMargin=14 * mm, title="Salary Slip")
+    n = ParagraphStyle("n", fontName=font, fontSize=9.5, leading=13)
+    b = ParagraphStyle("b", parent=n, fontName=bold)
+    story = []
+    _company_header(story, None, font, bold)
+    title = f"Salary Slip for {MONTHS[int(ym[5:7]) - 1]} {ym[:4]}"
+    story.append(Paragraph(title, ParagraphStyle("t", fontName=bold, fontSize=14, leading=18, alignment=1)))
+    story.append(Spacer(1, 8))
+    info = [[Paragraph("Employee", b), Paragraph(user["full_name"], n), Paragraph("Employee ID", b), Paragraph(fig["emp_code"], n)],
+            [Paragraph("Designation", b), Paragraph(prof.get("designation") or user["role"].title(), n), Paragraph("Branch", b), Paragraph(user["branch_name"] or "Head Office", n)],
+            [Paragraph("Date of joining", b), Paragraph(user["joining_date"] or "-", n), Paragraph("PAN", b), Paragraph(prof.get("pan") or "-", n)],
+            [Paragraph("Bank", b), Paragraph(prof.get("bank_name") or "-", n), Paragraph("Account no", b), Paragraph(prof.get("account_no") or "-", n)],
+            [Paragraph("Days in month", b), Paragraph(str(fig["days_in_month"]), n), Paragraph("Paid leave / Unpaid leave", b), Paragraph(f"{fig['paid_leave']} / {fig['lop_days']}", n)],
+            [Paragraph("Payable days", b), Paragraph(str(fig["payable_days"]), n), Paragraph("Pay date", b), Paragraph(fig["pay_date"], n)]]
+    t = Table(info, colWidths=[32 * mm, 58 * mm, 40 * mm, 48 * mm])
+    t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.4, colors.grey), ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f1f5f9")),
+                           ("BACKGROUND", (2, 0), (2, -1), colors.HexColor("#f1f5f9")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+    story.append(t)
+    story.append(Spacer(1, 10))
+    earn = [("Basic salary", fig["basic"]), ("House rent allowance", fig["hra"]), ("Other allowances", fig["allowances"]),
+            ("Incentive / bonus", fig["incentive"]), ("Overtime", fig["overtime"])]
+    ded = [("Provident fund", fig["pf"]), ("ESI", fig["esi"]), ("Professional tax", fig["ptax"]), ("Advance recovery", fig["advance"]),
+           (f"Unpaid leave ({fig['lop_days']} day(s))", fig["lop_amount"]), ("Other deductions", fig["other_ded"])]
+    rows = [[Paragraph("Earnings", b), Paragraph("Amount", b), Paragraph("Deductions", b), Paragraph("Amount", b)]]
+    for i in range(max(len(earn), len(ded))):
+        e = earn[i] if i < len(earn) else ("", None)
+        d = ded[i] if i < len(ded) else ("", None)
+        rows.append([Paragraph(e[0], n), Paragraph(inr(e[1], False) if e[1] is not None else "", n),
+                     Paragraph(d[0], n), Paragraph(inr(d[1], False) if d[1] is not None else "", n)])
+    rows.append([Paragraph("Gross earnings", b), Paragraph(inr(fig["gross"], False), b), Paragraph("Total deductions", b), Paragraph(inr(fig["deductions"], False), b)])
+    t2 = Table(rows, colWidths=[55 * mm, 34 * mm, 55 * mm, 34 * mm])
+    t2.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.4, colors.grey), ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e6f4f1")),
+                            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#f1f5f9")), ("ALIGN", (1, 1), (1, -1), "RIGHT"), ("ALIGN", (3, 1), (3, -1), "RIGHT")]))
+    story.append(t2)
+    story.append(Spacer(1, 10))
+    t3 = Table([[Paragraph("NET PAY", ParagraphStyle("np", fontName=bold, fontSize=12)), Paragraph(inr(fig["net"]), ParagraphStyle("npv", fontName=bold, fontSize=13, alignment=2))],
+                [Paragraph("Rupees " + number_to_words(fig["net"]) + " only", n), ""]], colWidths=[120 * mm, 58 * mm])
+    t3.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 1, colors.black), ("SPAN", (0, 1), (1, 1)), ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#fffbeb"))]))
+    story.append(t3)
+    if fig.get("note"):
+        story.append(Spacer(1, 6)); story.append(Paragraph("Note: " + fig["note"], n))
+    story.append(Spacer(1, 26))
+    story.append(Table([[Paragraph("Employee signature", n), Paragraph("Authorised signatory", ParagraphStyle("r", parent=n, alignment=2))]], colWidths=[89 * mm, 89 * mm]))
+    story.append(Spacer(1, 6))
+    story.append(Paragraph(f"Generated on {datetime.now().strftime('%d-%m-%Y %I:%M %p')}. This is a computer generated slip.",
+                           ParagraphStyle("f", parent=n, fontSize=7.5, textColor="#666666")))
+    doc.build(story)
+    return buf.getvalue()
+
+
+@app.route("/hr")
+@login_required
+def hr():
+    u = current_user()
+    if not (u["role"] == "admin" or (u["role"] == "manager" and u["can_hr_docs"])):
+        flash("You do not have permission for that page.", "error")
+        return redirect(url_for("dashboard"))
+    base = ("SELECT u.id, u.username, u.full_name, u.role, u.joining_date, u.active, b.name AS branch_name, p.emp_code, p.designation, p.monthly_salary, "
+            "p.photo, (SELECT COUNT(*) FROM staff_documents d WHERE d.user_id=u.id) AS docs, "
+            "(SELECT MAX(period) FROM staff_documents d WHERE d.user_id=u.id AND d.kind='salary_slip') AS last_slip "
+            "FROM users u LEFT JOIN branches b ON b.id=u.branch_id LEFT JOIN staff_profiles p ON p.user_id=u.id ")
+    rows = q(base + "ORDER BY u.active DESC, b.name, u.full_name") if u["role"] == "admin" else \
+        q(base + "WHERE u.role='cashier' AND u.branch_id=? ORDER BY u.active DESC, u.full_name", (u["branch_id"],))
+    return render_template("hr.html", rows=rows)
+
+
+@app.route("/hr/<int:uid>", methods=["GET", "POST"])
+@login_required
+def hr_staff(uid):
+    u = current_user()
+    target = hr_user(uid) or abort(404)
+    if not hr_can_manage(u, target):
+        abort(403)
+    if request.method == "POST":
+        f = request.form
+        photo = None
+        file = request.files.get("photo")
+        if file and file.filename:
+            ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+            if ext not in ("jpg", "jpeg", "png"):
+                flash("Photo must be JPG or PNG.", "error")
+                return redirect(url_for("hr_staff", uid=uid))
+            os.makedirs(PHOTO_DIR, exist_ok=True)
+            photo = f"u{uid}_{int(datetime.now().timestamp())}.{ext}"
+            file.save(os.path.join(PHOTO_DIR, photo))
+        vals = (f.get("emp_code", "").strip() or None, f.get("designation", "").strip(), f.get("phone", "").strip(), f.get("address", "").strip(),
+                f.get("dob") or None, f.get("blood_group", "").strip(), float(f.get("monthly_salary") or 0), float(f.get("hra") or 0),
+                float(f.get("allowances") or 0), f.get("bank_name", "").strip(), f.get("account_no", "").strip(), f.get("ifsc", "").strip(),
+                f.get("pan", "").strip().upper(), f.get("emergency_contact", "").strip())
+        run("INSERT INTO staff_profiles(user_id,emp_code,designation,phone,address,dob,blood_group,monthly_salary,hra,allowances,bank_name,account_no,ifsc,pan,"
+            "emergency_contact,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now','localtime')) "
+            "ON CONFLICT(user_id) DO UPDATE SET emp_code=excluded.emp_code, designation=excluded.designation, phone=excluded.phone, address=excluded.address, "
+            "dob=excluded.dob, blood_group=excluded.blood_group, monthly_salary=excluded.monthly_salary, hra=excluded.hra, allowances=excluded.allowances, "
+            "bank_name=excluded.bank_name, account_no=excluded.account_no, ifsc=excluded.ifsc, pan=excluded.pan, emergency_contact=excluded.emergency_contact, "
+            "updated_at=excluded.updated_at", (uid,) + vals)
+        if photo:
+            run("UPDATE staff_profiles SET photo=? WHERE user_id=?", (photo, uid))
+        if f.get("joining_date"):
+            run("UPDATE users SET joining_date=? WHERE id=?", (f["joining_date"], uid))
+        get_db().commit()
+        flash("Profile saved.", "success")
+        return redirect(url_for("hr_staff", uid=uid))
+    docs = q("SELECT d.*, c.full_name AS creator FROM staff_documents d LEFT JOIN users c ON c.id=d.created_by WHERE d.user_id=? ORDER BY d.id DESC", (uid,))
+    return render_template("hr_staff.html", t=target, p=profile_of(uid), docs=docs, this_month=date.today().strftime("%Y-%m"))
+
+
+@app.route("/hr/<int:uid>/offer-letter", methods=["POST"])
+@login_required
+def hr_offer_letter(uid):
+    u = current_user()
+    target = hr_user(uid) or abort(404)
+    if not hr_can_manage(u, target):
+        abort(403)
+    pdf, fields = build_offer_letter(target, profile_of(uid))
+    did = _save_doc(uid, "offer_letter", f"Offer letter - {target['full_name']}", None, pdf, fields)
+    flash("Offer letter generated.", "success")
+    return redirect(url_for("document_view", did=did))
+
+
+@app.route("/hr/<int:uid>/id-card", methods=["POST"])
+@login_required
+def hr_id_card(uid):
+    u = current_user()
+    target = hr_user(uid) or abort(404)
+    if not hr_can_manage(u, target):
+        abort(403)
+    pdf, data = build_id_card(target, profile_of(uid))
+    did = _save_doc(uid, "id_card", f"ID card - {target['full_name']}", None, pdf, data)
+    flash("ID card generated.", "success")
+    return redirect(url_for("document_view", did=did))
+
+
+@app.route("/hr/<int:uid>/salary-slip", methods=["GET", "POST"])
+@login_required
+def hr_salary_slip(uid):
+    u = current_user()
+    target = hr_user(uid) or abort(404)
+    if not hr_can_manage(u, target):
+        abort(403)
+    prof = profile_of(uid)
+    ym = (request.form.get("period") or request.args.get("period") or date.today().strftime("%Y-%m"))[:7]
+    try:
+        dim = month_days(ym)
+    except (ValueError, IndexError):
+        flash("Choose a valid month.", "error")
+        return redirect(url_for("hr_staff", uid=uid))
+    lop_auto = leave_days_in_month(uid, ym, unpaid=True)
+    paid_leave = leave_days_in_month(uid, ym, unpaid=False)
+    if request.method == "POST" and request.form.get("generate"):
+        f = request.form
+        g = lambda k: round(float(f.get(k) or 0), 2)
+        fig = {"emp_code": prof.get("emp_code") or f"EMP{uid:04d}", "days_in_month": dim, "lop_days": int(float(f.get("lop_days") or 0)),
+               "paid_leave": paid_leave, "basic": g("basic"), "hra": g("hra"), "allowances": g("allowances"), "incentive": g("incentive"),
+               "overtime": g("overtime"), "pf": g("pf"), "esi": g("esi"), "ptax": g("ptax"), "advance": g("advance"), "other_ded": g("other_ded"),
+               "note": f.get("note", "").strip(), "pay_date": f.get("pay_date") or date.today().isoformat()}
+        fixed = fig["basic"] + fig["hra"] + fig["allowances"]
+        fig["lop_amount"] = round(fixed / dim * fig["lop_days"], 2)
+        fig["payable_days"] = dim - fig["lop_days"]
+        fig["gross"] = round(fixed + fig["incentive"] + fig["overtime"], 2)
+        fig["deductions"] = round(fig["pf"] + fig["esi"] + fig["ptax"] + fig["advance"] + fig["other_ded"] + fig["lop_amount"], 2)
+        fig["net"] = round(fig["gross"] - fig["deductions"], 2)
+        pdf = build_salary_slip(target, prof, ym, fig)
+        did = _save_doc(uid, "salary_slip", f"Salary slip - {MONTHS[int(ym[5:7]) - 1]} {ym[:4]} - {target['full_name']}", ym, pdf, fig)
+        flash("Salary slip generated.", "success")
+        return redirect(url_for("document_view", did=did))
+    existing = q("SELECT id FROM staff_documents WHERE user_id=? AND kind='salary_slip' AND period=?", (uid, ym), one=True)
+    return render_template("salary_form.html", t=target, p=prof, period=ym, days=dim, lop_auto=lop_auto, paid_leave=paid_leave,
+                           existing=existing, months=MONTHS)
+
+
+@app.route("/documents/<int:did>")
+@login_required
+def document_view(did):
+    u = current_user()
+    d = q("SELECT * FROM staff_documents WHERE id=?", (did,), one=True) or abort(404)
+    target = hr_user(d["user_id"])
+    if not (d["user_id"] == u["id"] or (target and hr_can_manage(u, target))):
+        abort(403)
+    return send_from_directory(DOC_DIR, d["file"], as_attachment=request.args.get("download") == "1",
+                               download_name=secure_filename(d["title"]) + ".pdf", mimetype="application/pdf")
+
+
+@app.route("/documents/<int:did>/delete", methods=["POST"])
+@role_required("admin")
+def document_delete(did):
+    d = q("SELECT * FROM staff_documents WHERE id=?", (did,), one=True) or abort(404)
+    try:
+        os.remove(os.path.join(DOC_DIR, d["file"]))
+    except OSError:
+        pass
+    run("DELETE FROM staff_documents WHERE id=?", (did,))
+    get_db().commit()
+    flash("Document deleted.", "success")
+    return redirect(url_for("hr_staff", uid=d["user_id"]))
+
+
+@app.route("/photos/<path:fname>")
+@login_required
+def photo_file(fname):
+    return send_from_directory(PHOTO_DIR, fname)
+
+
+@app.route("/my-documents")
+@login_required
+def my_documents():
+    u = current_user()
+    docs = q("SELECT d.*, c.full_name AS creator FROM staff_documents d LEFT JOIN users c ON c.id=d.created_by WHERE d.user_id=? ORDER BY d.id DESC", (u["id"],))
+    return render_template("my_documents.html", docs=docs, p=profile_of(u["id"]), t=hr_user(u["id"]))
 
 
 if __name__ == "__main__":

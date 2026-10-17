@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}{{ settings.shop_name }}{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo-mark.svg') }}">
 <script>try{if(localStorage.getItem("rk_nav")==="collapsed")document.documentElement.classList.add("nav-collapsed");}catch(e){}</script>
 {% block head %}{% endblock %}
 </head>
@@ -16,7 +17,7 @@
 {%- endmacro %}
 <aside class="sidebar" id="sidebar">
   <div class="brand-row">
-    <a class="brand" href="{{ url_for('dashboard') }}" title="{{ settings.shop_name }}"><span class="lbl">{{ settings.shop_name }}</span><span class="short">{{ settings.shop_name[:2]|upper }}</span></a>
+    <a class="brand" href="{{ url_for('dashboard') }}" title="{{ settings.shop_name }}"><img src="{{ url_for('static', filename='logo-mark.svg') }}" class="brand-logo" alt=""><span class="lbl">{{ settings.shop_name }}</span></a>
     <button type="button" class="collapse-btn" onclick="collapseSidebar()" title="Collapse / expand menu"><span class="lbl">&#171;</span><span class="short">&#187;</span></button>
   </div>
   <nav>
@@ -46,6 +47,7 @@
     {% call item(url_for('leaves'), 'Leave', ['leaves','leave_new','leave_detail'], '&#9992;') %}{% if pending_leaves %}<span class="badge">{{ pending_leaves }}</span>{% endif %}{% endcall %}
     {{ item(url_for('leaderboard'), 'Leaderboard', ['leaderboard'], '&#127942;') }}
     {{ item(url_for('audit'), 'Login history' if current_user.role == 'cashier' else 'Login audit', ['audit'], '&#9201;') }}
+    {{ item(url_for('my_documents'), 'My documents', ['my_documents'], '&#128196;') }}
 
     {% if current_user.role in ['admin','manager'] or can_view_analytics %}
     <div class="grp">Management</div>
@@ -66,6 +68,9 @@
     {% endif %}
     {% if can_reset_device %}
     {{ item(url_for('devices'), 'Device locks', ['devices'], '&#128274;') }}
+    {% endif %}
+    {% if can_hr_docs %}
+    {{ item(url_for('hr'), 'Staff HR', ['hr','hr_staff','hr_salary_slip'], '&#128100;') }}
     {% endif %}
   </nav>
   <div class="sidebar-foot">

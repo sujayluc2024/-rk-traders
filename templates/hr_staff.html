@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ t.full_name }} - HR{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>{{ t.full_name }} <small class="hint">{{ t.role }} &middot; {{ t.branch_name or 'All branches' }}</small></h1><a href="{{ url_for('hr') }}" class="btn btn-outline">Back</a></div>
+<div class="grid grid-3">
+  <div class="card" style="grid-column: span 2">
+    <h2>Profile</h2>
+    <form method="post" enctype="multipart/form-data">
+      <div class="row">
+        <div class="field" style="flex:0 0 110px">{% if p.photo %}<img src="{{ url_for('photo_file', fname=p.photo) }}" class="photo-lg">{% else %}<div class="photo-lg ph">No photo</div>{% endif %}</div>
+        <div class="field"><label>Photo (JPG/PNG, for ID card)</label><input type="file" name="photo" accept=".jpg,.jpeg,.png">
+          <label style="margin-top:10px">Employee ID</label><input type="text" name="emp_code" value="{{ p.emp_code or '' }}" placeholder="e.g. RK-001"></div>
+        <div class="field"><label>Designation</label><input type="text" name="designation" value="{{ p.designation or '' }}" placeholder="e.g. Billing Cashier">
+          <label style="margin-top:10px">Joining date</label><input type="date" name="joining_date" value="{{ t.joining_date or '' }}"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Phone</label><input type="text" name="phone" value="{{ p.phone or '' }}"></div>
+        <div class="field"><label>Date of birth</label><input type="date" name="dob" value="{{ p.dob or '' }}"></div>
+        <div class="field"><label>Blood group</label><input type="text" name="blood_group" value="{{ p.blood_group or '' }}" placeholder="e.g. B+"></div>
+        <div class="field"><label>Emergency contact</label><input type="text" name="emergency_contact" value="{{ p.emergency_contact or '' }}" placeholder="name and phone"></div>
+      </div>
+      <div class="field"><label>Address</label><textarea name="address" rows="2">{{ p.address or '' }}</textarea></div>
+      <h3>Salary (monthly)</h3>
+      <div class="row">
+        <div class="field"><label>Basic &#8377;</label><input type="number" step="0.01" min="0" name="monthly_salary" value="{{ p.monthly_salary or '' }}"></div>
+        <div class="field"><label>HRA &#8377;</label><input type="number" step="0.01" min="0" name="hra" value="{{ p.hra or '' }}"></div>
+        <div class="field"><label>Other allowances &#8377;</label><input type="number" step="0.01" min="0" name="allowances" value="{{ p.allowances or '' }}"></div>
+      </div>
+      <h3>Bank and tax</h3>
+      <div class="row">
+        <div class="field"><label>Bank name</label><input type="text" name="bank_name" value="{{ p.bank_name or '' }}"></div>
+        <div class="field"><label>Account no</label><input type="text" name="account_no" value="{{ p.account_no or '' }}"></div>
+        <div class="field"><label>IFSC</label><input type="text" name="ifsc" value="{{ p.ifsc or '' }}"></div>
+        <div class="field"><label>PAN</label><input type="text" name="pan" value="{{ p.pan or '' }}"></div>
+      </div>
+      <button class="btn">Save profile</button>
+    </form>
+  </div>
+  <div>
+    <div class="card">
+      <h2>Generate documents</h2>
+      <form method="post" action="{{ url_for('hr_offer_letter', uid=t.id) }}"><button class="btn btn-lg" style="margin-bottom:8px">&#128196; Offer letter</button></form>
+      <form method="post" action="{{ url_for('hr_id_card', uid=t.id) }}"><button class="btn btn-lg" style="margin-bottom:8px">&#127380; ID card</button></form>
+      <a href="{{ url_for('hr_salary_slip', uid=t.id) }}" class="btn btn-lg btn-accent">&#8377; Salary slip</a>
+      <p class="hint">Each document is saved as a PDF, listed below, and the staff member is notified. Save the profile first so the details are right.</p>
+    </div>
+    <div class="card">
+      <h2>Documents issued</h2>
+      <table>
+        {% for d in docs %}
+        <tr><td><a href="{{ url_for('document_view', did=d.id) }}" target="_blank"><strong>{{ d.title }}</strong></a><br><small class="hint">{{ d.created_at }} &middot; by {{ d.creator }}</small></td>
+            <td style="white-space:nowrap"><a href="{{ url_for('document_view', did=d.id, download=1) }}" class="btn btn-sm btn-outline">Download</a>
+              {% if current_user.role == 'admin' %}<form method="post" action="{{ url_for('document_delete', did=d.id) }}" style="display:inline" onsubmit="return confirm('Delete this document?')"><button class="btn btn-sm btn-danger">Delete</button></form>{% endif %}</td></tr>
+        {% else %}<tr><td class="empty">No documents yet.</td></tr>{% endfor %}
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

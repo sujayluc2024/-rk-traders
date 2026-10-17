@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Salary slip{% endblock %}
+{% block content %}
+<div class="toolbar"><h1>Salary slip: {{ t.full_name }}</h1><a href="{{ url_for('hr_staff', uid=t.id) }}" class="btn btn-outline">Back to profile</a></div>
+<div class="card" style="max-width:860px">
+  <form method="get" class="inline-form" style="margin-bottom:14px">
+    <div class="field"><label>Month</label><input type="month" name="period" value="{{ period }}"></div>
+    <button class="btn btn-outline">Change month</button>
+  </form>
+  {% if existing %}<div class="flash flash-error">A slip for {{ months[period[5:7]|int - 1] }} {{ period[:4] }} already exists (<a href="{{ url_for('document_view', did=existing.id) }}" target="_blank">open it</a>). Generating again creates another copy.</div>{% endif %}
+  {% if not p.monthly_salary %}<div class="flash flash-error">Basic salary is not set in the profile. Fill it in or type the figures below.</div>{% endif %}
+  <form method="post">
+    <input type="hidden" name="period" value="{{ period }}">
+    <p><strong>{{ months[period[5:7]|int - 1] }} {{ period[:4] }}</strong> &middot; {{ days }} days &middot; approved paid leave {{ paid_leave }} day(s) &middot; approved unpaid leave {{ lop_auto }} day(s) (from leave records)</p>
+    <div class="grid grid-2">
+      <div>
+        <h3>Earnings</h3>
+        <div class="field"><label>Basic</label><input type="number" step="0.01" min="0" name="basic" value="{{ p.monthly_salary or 0 }}" required></div>
+        <div class="field"><label>House rent allowance</label><input type="number" step="0.01" min="0" name="hra" value="{{ p.hra or 0 }}"></div>
+        <div class="field"><label>Other allowances</label><input type="number" step="0.01" min="0" name="allowances" value="{{ p.allowances or 0 }}"></div>
+        <div class="field"><label>Incentive / bonus</label><input type="number" step="0.01" min="0" name="incentive" value="0"></div>
+        <div class="field"><label>Overtime</label><input type="number" step="0.01" min="0" name="overtime" value="0"></div>
+      </div>
+      <div>
+        <h3>Deductions</h3>
+        <div class="field"><label>Unpaid leave days <span class="hint">(auto from leave records, change if needed)</span></label><input type="number" step="1" min="0" max="{{ days }}" name="lop_days" value="{{ lop_auto }}"></div>
+        <div class="field"><label>Provident fund</label><input type="number" step="0.01" min="0" name="pf" value="0"></div>
+        <div class="field"><label>ESI</label><input type="number" step="0.01" min="0" name="esi" value="0"></div>
+        <div class="field"><label>Professional tax</label><input type="number" step="0.01" min="0" name="ptax" value="0"></div>
+        <div class="field"><label>Advance recovery</label><input type="number" step="0.01" min="0" name="advance" value="0"></div>
+        <div class="field"><label>Other deductions</label><input type="number" step="0.01" min="0" name="other_ded" value="0"></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Pay date</label><input type="date" name="pay_date" value="{{ today }}"></div>
+      <div class="field" style="flex:2"><label>Note (printed on slip)</label><input type="text" name="note"></div>
+    </div>
+    <p class="hint">Unpaid leave deduction = (basic + HRA + allowances) &divide; days in month &times; unpaid days. Net pay = earnings minus deductions, shown in words on the slip.</p>
+    <button class="btn btn-lg btn-accent" name="generate" value="1" style="width:auto">Generate salary slip (PDF)</button>
+  </form>
+</div>
+{% endblock %}

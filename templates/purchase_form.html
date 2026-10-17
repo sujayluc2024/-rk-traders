@@ -9,6 +9,7 @@
     <div class="field" style="flex:1"><label>Supplier bill no</label><input type="text" id="invoice_no"></div>
     <div class="field" style="flex:1"><label>Date</label><input type="date" id="date" value="{{ today }}"></div>
     <div class="field" style="flex:2"><label>Note</label><input type="text" id="note"></div>
+    <div class="field" style="flex:2"><label>Supplier bill (PDF / photo) *</label><input type="file" id="bill" accept=".pdf,.jpg,.jpeg,.png" required></div>
   </div>
   <div class="search-box" style="margin-bottom:12px">
     <input type="text" id="search" placeholder="Type product name to add..." autocomplete="off">
@@ -19,7 +20,7 @@
     <tbody></tbody>
     <tfoot><tr><th colspan="6" class="num">Grand total</th><th class="num" id="grand">&#8377;0.00</th><th></th></tr></tfoot>
   </table></div>
-  <p class="hint">Qty is added to stock of this branch. Tick "Update cost" to make this unit cost the product's new purchase price. Leave "New sell price" blank to keep the old one.</p>
+  <p class="hint"><strong>The supplier's bill is required</strong> and can be checked later from the purchase page. Qty is added to stock of this branch. Tick "Update cost" to make this unit cost the product's new purchase price. Leave "New sell price" blank to keep the old one.</p>
   <button class="btn btn-lg" id="save" style="width:auto">Save purchase</button>
 </div>
 {% endblock %}
@@ -66,10 +67,17 @@ function render() {
 function upd() { let total = 0; rows.forEach((r, i) => { const t = r.quantity * r.unit_cost; total += t; document.getElementById('t' + i).textContent = '₹' + t.toFixed(2); }); document.getElementById('grand').textContent = '₹' + total.toFixed(2); }
 document.getElementById('save').onclick = async () => {
   if (!rows.length) return alert('Add at least one item.');
-  const body = { supplier_id: document.getElementById('supplier_id').value, invoice_no: document.getElementById('invoice_no').value,
-    date: document.getElementById('date').value, note: document.getElementById('note').value, items: rows };
-  const r = await (await fetch('/purchases/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
-  if (r.ok) location.href = '/purchases/' + r.id; else alert(r.error || 'Could not save');
+  if (!document.getElementById('bill').files[0]) { alert("Please attach the supplier's bill (PDF or photo). It is required."); document.getElementById('bill').focus(); return; }
+  const fd = new FormData();
+  fd.append('supplier_id', document.getElementById('supplier_id').value); fd.append('invoice_no', document.getElementById('invoice_no').value);
+  fd.append('date', document.getElementById('date').value); fd.append('note', document.getElementById('note').value);
+  fd.append('items', JSON.stringify(rows));
+  const bill = document.getElementById('bill').files[0]; if (bill) fd.append('bill', bill);
+  document.getElementById('save').disabled = true;
+  try {
+    const r = await (await fetch('/purchases/new', { method: 'POST', body: fd })).json();
+    if (r.ok) location.href = '/purchases/' + r.id; else alert(r.error || 'Could not save');
+  } finally { document.getElementById('save').disabled = false; }
 };
 document.addEventListener('click', e => { if (!e.target.closest('.search-box')) hide(); });
 search.focus();
