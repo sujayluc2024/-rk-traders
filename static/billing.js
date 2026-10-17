@@ -51,7 +51,7 @@ function render() {
     <td>${i + 1}</td><td><strong>${r.name}</strong>${r.quantity > r.stock ? ' <span class="low">(only ' + r.stock + ' in stock)</span>' : ''}</td>
     <td class="num"><input class="qty" type="number" step="0.001" min="0.001" value="${r.quantity}" data-i="${i}"></td>
     <td>${r.unit}</td>
-    <td class="num"><input class="price" type="number" step="0.01" min="0" value="${r.unit_price}" data-i="${i}"></td>
+    <td class="num">${CAN_EDIT_PRICE ? `<input class="price" type="number" step="0.01" min="0" value="${r.unit_price}" data-i="${i}">` : fmt(r.unit_price)}</td>
     <td class="num">${r.gst_rate}%</td>
     <td id="off${i}" class="offer-cell"></td>
     <td class="num" id="amt${i}">${fmt(r.quantity * r.unit_price)}</td>

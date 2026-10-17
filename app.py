@@ -1098,7 +1098,11 @@ def api_sale_create():
         if not p:
             return jsonify(ok=False, error="Unknown product."), 400
         qty = float(it["quantity"])
-        price = float(it.get("unit_price") or p["selling_price"])
+        user = current_user()
+        if user["role"] == "cashier":
+            price = float(p["selling_price"])             # cashiers cannot change prices; server ignores any edited value
+        else:
+            price = float(it.get("unit_price") or p["selling_price"])
         if qty <= 0:
             return jsonify(ok=False, error=f"Invalid quantity for {p['name']}."), 400
         if not allow_neg and p["qty"] < qty:

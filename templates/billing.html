@@ -57,4 +57,4 @@
   </div>
 </div>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='billing.js') }}"></script>{% endblock %}
+{% block scripts %}<script>const CAN_EDIT_PRICE = {{ 'true' if current_user.role in ['admin','manager'] else 'false' }};</script><script src="{{ url_for('static', filename='billing.js') }}"></script>{% endblock %}

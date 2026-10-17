@@ -56,7 +56,7 @@ other PC open http://192.168.1.5:5000 in the browser.
 
 | Role | Can do |
 |---|---|
-| Cashier | Billing, view bills, customers, stock view |
+| Cashier | Billing at list price only (cannot change item prices), view bills, customers, stock view |
 | Manager | Cashier rights plus products, purchases, suppliers, stock adjustments, reports |
 | Admin | Everything, all branches, settings, users, cancel bills |
 
