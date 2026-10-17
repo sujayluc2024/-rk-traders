@@ -253,3 +253,11 @@ table.activity tr.failed td { background: #fff1f2; }
 /* ---------------- Login background ---------------- */
 .login-wrap.has-bg { background-size: cover; background-position: center; background-attachment: fixed; }
 .login-wrap.has-bg .login-box { background: rgba(255,255,255,.96); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+
+/* ---------------- Brand bar alignment fix ---------------- */
+.brand-row { height: 56px; }
+.sidebar .brand { padding: 0 12px; height: 56px; font-size: 17px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.brand-logo { width: 34px; height: 34px; margin-right: 10px; flex: none; }
+.collapse-btn { height: 56px; padding: 0 12px; flex: none; }
+.nav-collapsed .sidebar .brand { padding: 0; justify-content: center; }
+.nav-collapsed .brand-row { height: auto; }
