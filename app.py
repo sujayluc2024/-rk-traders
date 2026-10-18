@@ -133,6 +133,7 @@ def init_db():
     }
     for k, v in defaults.items():
         db.execute("INSERT OR IGNORE INTO settings(key,value) VALUES (?,?)", (k, v))
+    db.execute("UPDATE settings SET value=? WHERE key='offer_letter_template' AND (value IS NULL OR value='')", (defaults["offer_letter_template"],))
     db.execute("UPDATE users SET device_lock=0 WHERE role='admin' AND bound_ip IS NULL AND device_lock=1 "
                "AND NOT EXISTS (SELECT 1 FROM settings WHERE key='device_lock_initialised')")
     db.execute("INSERT OR IGNORE INTO settings(key,value) VALUES ('device_lock_initialised','1')")
@@ -1502,6 +1503,8 @@ def settings_page():
             run("UPDATE settings SET value='' WHERE key='login_bg_file'")
         for k in ["shop_name", "shop_tagline", "shop_address", "shop_phone", "shop_gstin", "state_name", "state_code", "invoice_footer",
                   "offer_letter_template", "emp_id_prefix", "designations", "id_card_validity_years", "signatory_name", "print_format"]:
+            if k not in request.form:
+                continue                                   # never blank a setting whose field was not on the form
             run("INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (k, request.form.get(k, "").strip()))
         run("INSERT INTO settings(key,value) VALUES ('allow_negative_stock',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",

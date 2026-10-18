@@ -50,6 +50,10 @@
     </div>
     <div class="field"><label>Authorised person's name (printed under the signature)</label><input type="text" name="signatory_name" value="{{ settings.signatory_name }}" placeholder="e.g. R. K. Mandal, Proprietor"></div>
     <p class="hint">The signature prints above "Authorised Signatory" on invoices, receipts, offer letters, salary slips, and ID cards. Upload a scanned signature above, or create a digital one below.</p>
+    <h2 id="offer" style="margin-top:18px">Offer letter template</h2>
+    <div class="field"><textarea name="offer_letter_template" rows="12">{{ settings.offer_letter_template }}</textarea></div>
+    <p class="hint">Placeholders filled automatically: {name}, {designation}, {branch}, {joining_date}, {salary}, {salary_words}, {company}, {date}. Leave a blank line between paragraphs.</p>
+    <p class="hint">A branch can have its own address and GSTIN under Branches. If a branch has a GSTIN, it is printed instead of the one here. With a GSTIN the bill says TAX INVOICE, otherwise CASH MEMO.</p>
     <button class="btn">Save settings</button>
   </form>
 </div>
@@ -71,12 +75,6 @@
     <p class="hint">This replaces the current signature. The name is also saved as the authorised person's name.</p>
   </form>
 </div>
-<div style="display:none">
-    <h2 id="offer" style="margin-top:18px">Offer letter template</h2>
-    <div class="field"><textarea name="offer_letter_template" rows="12">{{ settings.offer_letter_template }}</textarea></div>
-    <p class="hint">Placeholders filled automatically: {name}, {designation}, {branch}, {joining_date}, {salary}, {salary_words}, {company}, {date}. Leave a blank line between paragraphs.</p>
-    <p class="hint">A branch can have its own address and GSTIN under Branches. If a branch has a GSTIN, it is printed instead of the one here. With a GSTIN the bill says TAX INVOICE, otherwise CASH MEMO.</p>
-  </div>
 {% endblock %}
 {% block scripts %}
 <script>
