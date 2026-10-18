@@ -1779,6 +1779,12 @@ def devices():
     return render_template("devices.html", rows=rows, blocked=blocked)
 
 
+@app.route("/help")
+@login_required
+def help_page():
+    return render_template("help.html")
+
+
 @app.route("/change-password", methods=["GET", "POST"])
 @login_required
 def change_password():

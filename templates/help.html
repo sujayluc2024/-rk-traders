@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+{% block title %}Help{% endblock %}
+{% set role = current_user.role %}
+{% set is_mgr = role in ['admin','manager'] %}
+{% set is_admin = role == 'admin' %}
+{% block content %}
+<div class="toolbar">
+  <h1>Help &amp; user guide <small class="hint">showing topics for: {{ role }}</small></h1>
+  <div class="inline-form"><input type="search" id="helpq" placeholder="Search help..." style="width:260px"><button class="btn btn-outline" onclick="window.print()">Print this guide</button></div>
+</div>
+<div class="help-layout">
+<nav class="help-toc card">
+  <strong>Contents</strong>
+  <a href="#start">Getting started</a>
+  <a href="#billing">Billing a customer</a>
+  <a href="#udhaar">Customers and udhaar (credit)</a>
+  <a href="#stock">Products and stock</a>
+  {% if is_mgr %}<a href="#purchases">Purchases (stock in)</a><a href="#offers">Offers</a>{% endif %}
+  <a href="#notices">Notices</a>
+  {% if is_mgr %}<a href="#messages">Branch messages and stock requests</a>{% endif %}
+  <a href="#leave">Leave</a>
+  <a href="#leaderboard">Leaderboard and awards</a>
+  <a href="#history">Login history</a>
+  <a href="#mydocs">My documents</a>
+  {% if can_hr_docs %}<a href="#hr">Staff HR documents</a>{% endif %}
+  {% if is_mgr %}<a href="#reports">Reports and exports</a>{% endif %}
+  {% if can_view_analytics %}<a href="#analytics">Analytics</a>{% endif %}
+  {% if can_manage_users or is_admin %}<a href="#users">Users</a>{% endif %}
+  {% if can_reset_device %}<a href="#devices">Device locks</a>{% endif %}
+  {% if is_admin %}<a href="#settings">Settings</a><a href="#branches">Branches, counters, printing, signatures</a><a href="#activity">Activity log</a><a href="#backup">Backup and GitHub</a>{% endif %}
+  <a href="#faq">Common questions</a>
+</nav>
+
+<div class="help-body">
+
+<section class="card" id="start">
+  <h2>Getting started</h2>
+  <ol>
+    <li><strong>Log in</strong> with the username and password given to you. Your account is locked to the first computer you log in from. If you must use another computer, ask the manager or admin to reset your device.</li>
+    <li><strong>Choose your billing counter</strong> on the next screen. Every bill you make is numbered under that counter. You can change counter from the top bar.</li>
+    <li>The <strong>left menu</strong> holds everything. Click the arrows at the top of the menu to shrink it to icons. On a phone, tap the menu button in the top bar.</li>
+    <li><strong>Notice popups</strong> appear when the office sends you a notice. Read it and click "I have read this". It will keep coming back until you do.</li>
+    <li><strong>Log out</strong> from the bottom of the menu when you leave the counter. Your login and logout times are recorded.</li>
+    <li>To change your password, click the key icon at the bottom of the menu.</li>
+  </ol>
+</section>
+
+<section class="card" id="billing">
+  <h2>Billing a customer</h2>
+  <ol>
+    <li>Open <strong>Billing</strong>. The cursor is already in the search box.</li>
+    <li>Type part of the product name, pick it with the arrow keys, press <span class="kbd">Enter</span>. The item is added with quantity 1 and the cursor jumps to the quantity box.</li>
+    <li>Type the quantity (decimals allowed for loose items, e.g. 0.250) and press <span class="kbd">Enter</span> to return to search. Press <span class="kbd">F2</span> any time to jump back to search.</li>
+    <li>Items with a live offer show an <span class="offer-tag">OFFER</span> tag; the saving is applied automatically and shown in the totals.</li>
+    <li>Optional: pick a customer by name or phone, or click <strong>+</strong> to add one. Needed only for credit bills or when the customer wants their name on the bill.</li>
+    <li>Choose payment: <strong>Cash</strong>, <strong>UPI</strong>, <strong>Card</strong> or <strong>Credit</strong>. For cash you can type the amount received to see the change to return.</li>
+    <li>Press <span class="kbd">F9</span> or click <strong>Save &amp; Print</strong>. The bill opens in a new tab in the format set for your branch (A4 or thermal) and the print dialog appears.</li>
+  </ol>
+  <p class="hint">{% if role == 'cashier' %}Prices cannot be changed at the counter. If a price is wrong, tell your manager.{% else %}Managers and admin can adjust an item's price on the bill for special cases; the change is recorded in the activity log.{% endif %}
+  A manual discount can be typed in the Discount box. {% if is_admin %}Only admin can cancel a saved bill (Bills page), which restores stock.{% else %}If a bill was made by mistake, ask the admin to cancel it.{% endif %}</p>
+  <p><strong>Reprint:</strong> Bills page, find the bill, click Print (branch format), 80 (thermal) or A4.</p>
+</section>
+
+<section class="card" id="udhaar">
+  <h2>Customers and udhaar (credit)</h2>
+  <ul>
+    <li><strong>Credit bill:</strong> on the billing screen choose Credit, select or add the customer, enter the amount paid now. The rest goes to the customer's udhaar. The bill prints the previous balance, this bill's credit and the total due.</li>
+    <li><strong>Collecting money:</strong> Customers &gt; click the customer &gt; Receive payment. Enter the amount, mode and optionally which invoice it is for (otherwise oldest first). Click Save &amp; print receipt. A numbered receipt voucher prints listing the invoices it settled and the balance still due.</li>
+    <li>The customer page shows <strong>Unpaid invoices</strong> and a full <strong>Statement</strong> with every bill and receipt by number. The <strong>Receipts</strong> menu lists all receipts for the branch.</li>
+    <li>{% if is_admin %}Admin can cancel a receipt from the Receipts page; the amount becomes due again. A bill with a receipt applied cannot be cancelled until that receipt is cancelled.{% else %}If a receipt was entered wrongly, ask the admin to cancel it.{% endif %}</li>
+  </ul>
+</section>
+
+<section class="card" id="stock">
+  <h2>Products and stock</h2>
+  <ul>
+    <li><strong>Products</strong> lists every item with unit, HSN, GST rate, cost, selling price, MRP and current stock for your branch. Use the search box and category filter.</li>
+    <li><strong>Stock</strong> shows quantities, alert levels, cost and sell price per item, and the total stock value. Tick "Low stock only" to see items at or below their alert level; the dashboard also counts them.</li>
+    {% if is_mgr %}
+    <li><strong>Add or edit a product:</strong> Products &gt; Add Product or Edit. Selling price includes GST, the way MRP works. Set the low stock alert level per item.</li>
+    <li><strong>Adjust</strong> on the Stock page is only for corrections: damaged, expired or a counting difference. Use a negative number to remove stock and always type a reason. Stock history shows every adjustment.</li>
+    <li><strong>Transfer to branch</strong> moves stock from your branch to another and records it on both sides.</li>
+    <li>Bought new stock, maybe at a new price? Do not use Adjust. Record a <a href="#purchases">Purchase</a>.</li>
+    {% else %}
+    <li>You can view products and stock but not change them. Report wrong stock or prices to your manager.</li>
+    {% endif %}
+  </ul>
+</section>
+
+{% if is_mgr %}
+<section class="card" id="purchases">
+  <h2>Purchases (stock in)</h2>
+  <ol>
+    <li>Purchases &gt; <strong>New Purchase</strong> (also the "+ Purchase (stock in)" button on the Stock page).</li>
+    <li>Choose the supplier, type the supplier's bill number and date.</li>
+    <li>Type each product name and press Enter; enter the quantity and the <strong>unit cost</strong> you paid. Optionally type a <strong>New sell price</strong>. Keep "Update cost?" ticked so the product's purchase price becomes this cost.</li>
+    <li><strong>Attach the supplier's bill</strong> (PDF or photo). This is required; the purchase cannot be saved without it.</li>
+    <li>Click Save purchase. Stock goes up at your branch. The bill copy can be viewed or replaced later from the purchase page.</li>
+  </ol>
+  <p><strong>Suppliers</strong> are managed under the Suppliers menu (name, phone, GSTIN, address).</p>
+</section>
+
+<section class="card" id="offers">
+  <h2>Offers</h2>
+  <ul>
+    <li>Offers &gt; <strong>New offer</strong>. Types: % off a product, special price for a product, buy X get Y free, % off a category, % off the bill above an amount, flat amount off the bill above an amount.</li>
+    <li>Set the dates. {% if is_admin %}Admin can choose all branches or one branch.{% else %}Your offers apply to your branch only; offers made by admin for all branches also apply.{% endif %}</li>
+    <li>Live offers apply automatically at billing. When several match one item the customer gets the best one; a bill offer applies after item offers. The bill prints the offer name and "You saved".</li>
+    <li>Switch an offer off, edit it, or delete it from the list. The list shows Live, Upcoming, Expired or Off.</li>
+  </ul>
+</section>
+{% endif %}
+
+<section class="card" id="notices">
+  <h2>Notices</h2>
+  <ul>
+    <li>Notices sent to you pop up on every screen until you click "I have read this". They are also listed under <strong>Notices</strong> and on the dashboard.</li>
+    {% if is_mgr %}
+    <li><strong>Send a notice:</strong> Notices &gt; New notice. {% if is_admin %}Admin can send to all staff of all branches, selected branches, selected staff, or managers only.{% else %}A manager can send to all staff of their branch or to selected staff.{% endif %}</li>
+    <li>The Sent tab shows who has read each notice and when. The sender can delete a notice.</li>
+    {% endif %}
+  </ul>
+</section>
+
+{% if is_mgr %}
+<section class="card" id="messages">
+  <h2>Branch messages and stock requests</h2>
+  <ul>
+    <li><strong>Branch messages</strong> lets managers of different branches talk in threads. An unread count shows in the menu.</li>
+    <li><strong>Request stock:</strong> Branch messages &gt; Request stock. Type the product; the form shows how much every branch has. Enter the quantity and send.</li>
+    <li>The receiving branch opens the request and clicks <strong>Send stock</strong>, which transfers the quantity immediately and records it in stock history on both sides, or <strong>Decline</strong> with a reason. The requester can reopen or close the thread.</li>
+  </ul>
+</section>
+{% endif %}
+
+<section class="card" id="leave">
+  <h2>Leave</h2>
+  <ul>
+    <li><strong>Apply:</strong> Leave &gt; Apply for leave. Choose the type, dates and reason, and attach a document if needed (for example a medical certificate). The right side shows your balance for the year: entitled, used, pending and left. A type not yet available to you (new joiners) shows the date it becomes available.</li>
+    <li>{% if role == 'cashier' %}Your branch manager{% elif role == 'manager' %}The admin{% else %}Another admin{% endif %} approves or rejects it. You get a notice with the result. You can withdraw a pending application.</li>
+    {% if is_mgr %}
+    <li><strong>Approve:</strong> Leave &gt; Pending approvals. Open the application, view the document and the person's balance, click Approve or Reject with a note. {% if is_admin %}Admin can override a manager's decision later with a reason; both people are notified.{% else %}A decision cannot be changed by the manager afterwards; only admin can override it.{% endif %}</li>
+    {% endif %}
+    {% if is_admin %}<li><strong>Policy:</strong> Settings &gt; Leave policy sets days per year and the months after joining before each type is available. Joining dates are set under Users.</li>{% endif %}
+  </ul>
+</section>
+
+<section class="card" id="leaderboard">
+  <h2>Leaderboard and awards</h2>
+  <ul>
+    <li><strong>Leaderboard</strong> ranks staff of your branch by sales for today, this week, this month, this year or custom dates. {% if is_admin %}Admin can pick any branch or all branches.{% endif %}</li>
+    <li>Awards you have received show at the top of your leaderboard, and you get a notice when one is given.</li>
+    {% if is_mgr %}<li><strong>Give a prize:</strong> on the leaderboard choose the staff member, a title such as "Star Cashier of the Month", the prize and a note. The winner is notified and the award is listed for the branch.</li>{% endif %}
+  </ul>
+</section>
+
+<section class="card" id="history">
+  <h2>{{ 'Login history' if role == 'cashier' else 'Login audit' }}</h2>
+  <ul>
+    <li>Every login is recorded with date, time, branch, counter and logout time, plus the bills and sales made in that session. Closing the browser without logging out is marked "Not logged out".</li>
+    <li>{% if role == 'cashier' %}You can see your own history under Login history, by login or as a daily summary, and export it.{% else %}Login audit shows {{ 'everyone' if is_admin else 'your branch' }}, by login or daily summary, with staff filter and Excel/CSV/PDF export.{% endif %}</li>
+  </ul>
+</section>
+
+<section class="card" id="mydocs">
+  <h2>My documents</h2>
+  <ul>
+    <li>Your offer letter, ID card and monthly salary slips appear under <strong>My documents</strong> as PDFs. You get a notice when a new one is issued. View, print or download them any time.</li>
+    <li><strong>Offer letter:</strong> print it, sign it, take a photo or scan, and upload it in the "Signed copy" column. The office is notified.</li>
+    <li>Your details (employee ID, designation, joining date) are shown there. If anything is wrong, tell your manager or the admin.</li>
+  </ul>
+</section>
+
+{% if can_hr_docs %}
+<section class="card" id="hr">
+  <h2>Staff HR documents</h2>
+  <ol>
+    <li><strong>Staff HR</strong> lists {{ 'all staff' if is_admin else 'the cashiers of your branch' }}. Open a person's <strong>Profile</strong> and fill designation, phone, address, date of birth, blood group, photo, salary (basic, HRA, allowances), bank details, PAN and emergency contact. The employee ID is generated automatically.</li>
+    <li><strong>Offer letter:</strong> one click; built from the template{% if is_admin %} under Settings{% endif %} with the person's details. When the staff member uploads the signed copy you are notified and it shows against the letter; you can also file a scan yourself.</li>
+    <li><strong>ID card:</strong> set the valid-till date and click. Prints front and back at card size; cut along the lines.</li>
+    <li><strong>Salary slip:</strong> choose the month. Earnings are prefilled from the profile and unpaid leave days are counted from approved leave. Adjust figures, add incentive or deductions, and generate. The slip shows net pay in words.</li>
+  </ol>
+  <p class="hint">Every document is saved on the person's page and the staff member sees it under My documents.</p>
+</section>
+{% endif %}
+
+{% if is_mgr %}
+<section class="card" id="reports">
+  <h2>Reports and exports</h2>
+  <ul>
+    <li><strong>Reports</strong>: Daily sales summary, GST summary (for your GST return), item-wise sales and profit, counter-wise sales, purchase register, branch comparison. Pick the type and dates.</li>
+    <li>Every report, and also the Bills, Receipts, Stock, Customers, Login audit{% if is_admin %} and Activity log{% endif %} pages, has <strong>Excel</strong>, <strong>CSV</strong> and <strong>PDF</strong> buttons. Each file starts with the company and branch details, the period and who generated it.</li>
+  </ul>
+</section>
+{% endif %}
+
+{% if can_view_analytics %}
+<section class="card" id="analytics">
+  <h2>Analytics</h2>
+  <ul>
+    <li>Growth figures against the previous equal period, daily sales, 12-month sales and profit, branch comparison, top products, categories, payment mix, busy hours and weekdays, cashier performance, slow-moving stock, top customers, and plain-language insights.</li>
+    <li>Choose the period at the top. {% if is_admin %}Admin can view overall or one branch.{% else %}You see your own branch.{% endif %} Every chart has a Table link for exact figures.</li>
+  </ul>
+</section>
+{% endif %}
+
+{% if can_manage_users or is_admin %}
+<section class="card" id="users">
+  <h2>Users</h2>
+  <ul>
+    {% if is_admin %}
+    <li><strong>Add a user:</strong> Users &gt; fill username, name, role (cashier, manager, admin), branch, designation (dropdown), joining date and password. The employee ID is assigned automatically.</li>
+    <li><strong>Permissions for managers:</strong> create cashier users; reset device locks; manage HR documents; view analytics. Tick what each manager may do.</li>
+    <li><strong>Device lock:</strong> on by default for cashiers and managers; the first login binds the computer. Untick to allow any computer.</li>
+    <li>Untick <strong>Active</strong> to stop someone logging in without deleting their history.</li>
+    {% else %}
+    <li><strong>Cashier users:</strong> you can add cashiers for your branch, change their name, reset their password, set the joining date, and deactivate them. Role and branch are fixed.</li>
+    {% endif %}
+  </ul>
+</section>
+{% endif %}
+
+{% if can_reset_device %}
+<section class="card" id="devices">
+  <h2>Device locks</h2>
+  <ul>
+    <li>Each locked account shows the registered computer address and when it was bound, plus recent blocked login attempts.</li>
+    <li>Click <strong>Reset device</strong> when a computer is replaced or its address changed. The next login registers the new machine.</li>
+    <li>Give each counter PC a fixed address in the router (DHCP reservation) so the lock stays reliable.</li>
+  </ul>
+</section>
+{% endif %}
+
+{% if is_admin %}
+<section class="card" id="settings">
+  <h2>Settings</h2>
+  <ul>
+    <li><strong>Shop details</strong> printed on every bill and report: name, tagline, address, phone, GSTIN, state. With a GSTIN the bill says TAX INVOICE, otherwise CASH MEMO.</li>
+    <li><strong>Allow billing when stock is zero</strong>: normally off, so a bill is refused when stock is insufficient.</li>
+    <li><strong>Staff settings</strong>: employee ID prefix, ID card validity years, designation list.</li>
+    <li><strong>Bill printing</strong>: company default format (A4, thermal 80 mm, thermal 58 mm). Branches can override.</li>
+    <li><strong>Login page background</strong>: upload a photo for the login screen.</li>
+    <li><strong>Authorised signature</strong>: upload a scanned signature or create one from a typed name in a handwriting style. It prints on bills, receipts, offer letters, salary slips and ID cards with the signatory's name.</li>
+    <li><strong>Offer letter template</strong> with placeholders such as {name}, {designation}, {salary}.</li>
+    <li><strong>Leave policy</strong> (separate page) for entitlement per leave type.</li>
+  </ul>
+</section>
+
+<section class="card" id="branches">
+  <h2>Branches, counters, printing, signatures</h2>
+  <ul>
+    <li><strong>Branches &amp; counters</strong>: add a branch with a short code (used in invoice numbers), address, phone, own GSTIN if different, and its bill format. Each branch gets Counter 1; add more counters so several cashiers can bill at once, each with its own bill number sequence.</li>
+    <li><strong>Branch signatures</strong>: give a branch its own authorised signature and signatory name (upload or create from a name). Its bills, receipts and staff documents use it; otherwise the company signature is used.</li>
+    <li><strong>Thermal printer</strong>: install the printer's Windows driver, set the paper width, and in the browser print dialog choose the printer with margins None and scale 100%. Set the branch's bill format to the matching thermal size.</li>
+    <li><strong>Other PCs</strong> in the shop open the system at the main PC's address, for example http://192.168.1.5:5000.</li>
+  </ul>
+</section>
+
+<section class="card" id="activity">
+  <h2>Activity log</h2>
+  <ul>
+    <li>Every action by every user is recorded: bills, cancellations, purchases, stock changes, price edits, payments, settings, users, notices, leave decisions, logins, failed and blocked logins, prints and exports. Passwords are never stored.</li>
+    <li>Default is today; pick a date range, filter by staff or branch, search by text such as a bill number, and export.</li>
+  </ul>
+</section>
+
+<section class="card" id="backup">
+  <h2>Backup and GitHub</h2>
+  <ul>
+    <li>All data is in one file, <strong>rktraders.db</strong>, and uploaded files (supplier bills, leave documents, staff documents, photos, signatures) are in the <strong>uploads</strong> folder, both inside the project folder. Copy both to a pen drive or cloud folder every day.</li>
+    <li>The program code is on GitHub. It never contains the database or uploads. After editing code yourself, double-click <strong>push.bat</strong> to upload the change.</li>
+    <li>To start the system: double-click <strong>start.bat</strong>. Keep its window open while the shop is running.</li>
+  </ul>
+</section>
+{% endif %}
+
+<section class="card" id="faq">
+  <h2>Common questions</h2>
+  <dl class="faq">
+    <dt>I cannot log in: "locked to another device".</dt><dd>Your account is bound to the first computer you used. Ask the {{ 'manager or admin' if role == 'cashier' else 'admin' }} to reset your device, then log in again from this computer.</dd>
+    <dt>The bill did not print.</dt><dd>Open Bills, find the bill and click Print again. Check the printer is on and selected in the print dialog.</dd>
+    <dt>The product is not found while billing.</dt><dd>Try a shorter part of the name. If it is a new item, {{ 'ask your manager to add it under Products.' if role == 'cashier' else 'add it under Products > Add Product.' }}</dd>
+    <dt>"Only X in stock" when billing.</dt><dd>The system has less stock than you are selling. {{ 'Tell your manager to check the stock.' if role == 'cashier' else 'Record the purchase or correct the stock with Adjust, then bill again.' }}</dd>
+    <dt>A customer paid old udhaar.</dt><dd>Customers &gt; the customer &gt; Receive payment &gt; Save &amp; print receipt. Give them the receipt.</dd>
+    <dt>The popup notice keeps coming back.</dt><dd>Click "I have read this" on each notice. "Remind me later" only hides it for the current screen.</dd>
+    <dt>Where are my salary slips?</dt><dd>My documents in the left menu.</dd>
+  </dl>
+</section>
+
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('helpq').addEventListener('input', function () {
+  const q = this.value.trim().toLowerCase();
+  document.querySelectorAll('.help-body section').forEach(sec => {
+    sec.style.display = (!q || sec.textContent.toLowerCase().includes(q)) ? '' : 'none';
+  });
+});
+</script>
+{% endblock %}

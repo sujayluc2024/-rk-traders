@@ -24,6 +24,10 @@ other PC open http://192.168.1.5:5000 in the browser.
    Selling price is GST-inclusive, like MRP.
 5. **Suppliers** - optional, for purchase entries.
 
+## Help inside the system
+
+Every user has a **Help** item in the left menu. It shows a step-by-step guide filtered to their role: cashiers see billing, udhaar, stock viewing, notices, leave, leaderboard, login history and My documents; managers also see purchases, offers, branch messages, approvals, reports and any permissions they hold; admin sees everything including settings, branches, printing, signatures, activity log and backup. It has a search box and a Print button.
+
 ## Daily use
 
 - **Billing**: type the product name, press Enter, type the quantity, press Enter to go back to search. Press F9 to save and print. The bill opens in a new tab and the print dialog appears.

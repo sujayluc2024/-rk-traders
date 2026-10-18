@@ -261,3 +261,14 @@ table.activity tr.failed td { background: #fff1f2; }
 .collapse-btn { height: 56px; padding: 0 12px; flex: none; }
 .nav-collapsed .sidebar .brand { padding: 0; justify-content: center; }
 .nav-collapsed .brand-row { height: auto; }
+
+/* ---------------- Help ---------------- */
+.help-layout { display: grid; grid-template-columns: 240px 1fr; gap: 18px; align-items: start; }
+@media (max-width: 900px) { .help-layout { grid-template-columns: 1fr; } }
+.help-toc { position: sticky; top: 66px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.help-toc a { padding: 3px 0; }
+.help-body section h2 { color: var(--primary-dark); border-bottom: 2px solid #e6f4f1; padding-bottom: 6px; }
+.help-body li { margin: 6px 0; line-height: 1.5; }
+.help-body ol, .help-body ul { padding-left: 22px; }
+.faq dt { font-weight: 700; margin-top: 10px; } .faq dd { margin: 2px 0 0; color: #334155; }
+@media print { .sidebar, .topbar, .help-toc, .toolbar .inline-form, #noticeModal { display: none !important; } .has-sidebar .container { margin-left: 0; } .help-layout { display: block; } .card { box-shadow: none; border: none; page-break-inside: avoid; } }

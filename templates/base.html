@@ -48,6 +48,7 @@
     {{ item(url_for('leaderboard'), 'Leaderboard', ['leaderboard'], '&#127942;') }}
     {{ item(url_for('audit'), 'Login history' if current_user.role == 'cashier' else 'Login audit', ['audit'], '&#9201;') }}
     {{ item(url_for('my_documents'), 'My documents', ['my_documents'], '&#128196;') }}
+    {{ item(url_for('help_page'), 'Help', ['help_page'], '&#10067;') }}
 
     {% if current_user.role in ['admin','manager'] or can_view_analytics %}
     <div class="grp">Management</div>
