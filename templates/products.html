@@ -4,7 +4,7 @@
 <div class="toolbar">
   <h1>Products</h1>
   <form method="get">
-    <input type="search" name="q" value="{{ search }}" placeholder="Search by name...">
+    <input type="search" name="q" value="{{ search }}" placeholder="Search by name or barcode...">
     <select name="cat"><option value="">All categories</option>
       {% for c in categories %}<option value="{{ c.id }}" {{ 'selected' if cat|string==c.id|string }}>{{ c.name }}</option>{% endfor %}</select>
     <button class="btn btn-outline">Filter</button>
@@ -18,7 +18,7 @@
   <tr><th>Name</th><th>Category</th><th>Unit</th><th>HSN</th><th class="num">GST %</th><th class="num">Cost</th><th class="num">Sell price</th><th class="num">MRP</th><th class="num">Stock ({{ current_branch.code }})</th><th></th></tr>
   {% for p in products %}
   <tr>
-    <td><strong>{{ p.name }}</strong></td><td>{{ p.category or '-' }}</td><td>{{ p.unit }}</td><td>{{ p.hsn or '-' }}</td>
+    <td><strong>{{ p.name }}</strong>{% if p.barcode %}<br><small class="hint barcode" title="barcode">&#9646;&#9647;&#9646; {{ p.barcode }}</small>{% endif %}</td><td>{{ p.category or '-' }}</td><td>{{ p.unit }}</td><td>{{ p.hsn or '-' }}</td>
     <td class="num">{{ p.gst_rate|qty }}%</td><td class="num">{{ p.purchase_price|inr }}</td><td class="num">{{ p.selling_price|inr }}</td>
     <td class="num">{{ p.mrp|inr if p.mrp else '-' }}</td>
     <td class="num {{ 'low' if p.qty <= p.low_stock_level }}">{{ p.qty|qty }}</td>

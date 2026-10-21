@@ -5,6 +5,9 @@
   <h1>{{ 'Edit product' if p else 'Add product' }}</h1>
   <form method="post">
     <div class="field"><label>Product name *</label><input type="text" name="name" value="{{ p.name if p }}" required autofocus placeholder="e.g. Fortune Sunflower Oil 1L"></div>
+    <div class="field"><label>Barcode <span class="hint">(optional)</span></label>
+      <input type="text" name="barcode" id="barcode" class="barcode" value="{{ p.barcode if p and p.barcode }}" placeholder="Click here and scan the packet, or type the number under the bars" autocomplete="off" inputmode="numeric">
+      <p class="hint" style="margin:4px 0 0">With this saved, the cashier can scan the packet on the billing screen and the item is added at once.</p></div>
     <div class="row">
       <div class="field"><label>Category</label>
         <select name="category_id"><option value="">-- none --</option>
@@ -33,4 +36,12 @@
     <a href="{{ url_for('products') }}" class="btn btn-outline">Cancel</a>
   </form>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+// a scanner ends its code with Enter; do not let that submit the half-filled form
+document.getElementById('barcode').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); document.querySelector('[name=category_id]').focus(); }
+});
+</script>
 {% endblock %}

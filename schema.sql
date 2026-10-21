@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS products (
     purchase_price  REAL NOT NULL DEFAULT 0,          -- cost per unit (GST inclusive)
     selling_price   REAL NOT NULL DEFAULT 0,          -- sale price per unit (GST inclusive)
     mrp             REAL,
+    barcode         TEXT,                             -- scanner code printed on the packet (EAN/UPC), optional
     low_stock_level REAL NOT NULL DEFAULT 5,
     active          INTEGER NOT NULL DEFAULT 1
 );

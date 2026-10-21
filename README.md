@@ -20,7 +20,7 @@ other PC open http://192.168.1.5:5000 in the browser.
 1. **Settings** - shop name, address, phone, GSTIN, change the admin password.
 2. **Settings > Branches & Counters** - add your branches and counters (Main Branch with Counter 1 already exists).
 3. **Settings > Users** - add cashiers and managers and attach each one to a branch.
-4. **Products** - add items with GST rate, cost, selling price and opening stock.
+4. **Products** - add items with GST rate, cost, selling price and opening stock. Click in the Barcode box and scan the packet (or type the number under the bars) so the cashier can scan it at billing.
    Selling price is GST-inclusive, like MRP.
 5. **Suppliers** - optional, for purchase entries.
 
@@ -30,7 +30,8 @@ Every user has a **Help** item in the left menu. It shows a step-by-step guide f
 
 ## Daily use
 
-- **Billing**: type the product name, press Enter, type the quantity, press Enter to go back to search. Press F9 to save and print. The bill opens in a new tab and the print dialog appears.
+- **Prices on the bill** are fixed from the product record for every role, including admin. To change a price, edit the product or record a purchase with the new price; use the Discount box or an Offer for a special deal.
+- **Billing**: type the product name, press Enter, type the quantity, press Enter to go back to search. With a USB or Bluetooth barcode scanner, click in the search box and scan the packet: the item is added at once and the cursor stays ready for the next scan; scanning the same packet again adds one more. Any scanner that types like a keyboard works, no setup needed. Products, Stock and the purchase screen also find items by barcode. Press F9 to save and print. The bill opens in a new tab and the print dialog appears.
 - **Bill formats**: A4 page, thermal 80 mm, or thermal 58 mm. Set the company default under Settings > Bill printing, and give any branch its own format under Branches & counters (for example one branch on a thermal printer, another on A4); every bill page also has buttons for the other formats. For a thermal printer: install its Windows driver, set the paper width in the driver, then in the browser print dialog pick the thermal printer, set Margins to None and Scale to 100%, and untick headers and footers. Tick "Remember" in the dialog, or set the thermal printer as the Windows default, so the next prints go straight through.
 - **Credit (udhaar)**: choose Credit as the payment mode, pick or add a customer, enter the amount paid now. The rest is added to the customer's balance. The bill prints the previous balance, this bill's credit, and the total due.
 - **Collecting udhaar**: open Customers > customer name. Enter the amount, mode, and optionally which invoice it is for (default is oldest first). Click Save & print receipt. A numbered receipt voucher (for example MB/RCPT/2627/00007) prints with the invoices it settled and the balance still due. The customer page shows unpaid invoices and a full statement with invoice and receipt numbers. The Receipts menu lists all receipts for the branch.
@@ -57,6 +58,17 @@ Every user has a **Help** item in the left menu. It shows a step-by-step guide f
 - **Analytics** (admin, or anyone admin grants access under Users with "Allow access to the Analytics dashboard"): growth figures versus the previous equal period, daily sales by branch, 12-month sales and profit, branch comparison, top products, category share, payment mix, busy hours, busy weekdays, cashier performance, slow-moving stock, top customers, and plain-language insights. Admin can view overall or one branch; other viewers see their own branch. Every chart has a Table link underneath. Charts work without internet.
 - **Offers** (managers and admin, under Inventory): create a percentage off a product, a special price, buy X get Y free, a percentage off a whole category, or a bill-level offer such as 5% or a flat amount off bills above a threshold. Set the dates, switch it on or off, and for admin choose all branches or one. Live offers apply automatically on the billing screen: items with an offer are tagged OFFER in the search list, the savings show in the totals, and the invoice prints the offer name on each item and "You saved" at the bottom. When several offers match, the customer gets the best one. Managers create offers for their own branch only.
 - **Reports**: daily sales, GST summary (for your GST return), item-wise profit, counter-wise sales, purchases, branch comparison. Every report exports to Excel, CSV, and PDF. Each file starts with the company details and the branch details, the report title, the period, and who generated it and when.
+
+## Barcode scanner
+
+Any USB or Bluetooth barcode scanner that types like a keyboard works. No driver or setting in the system is needed.
+
+1. **Save the barcode on each product** (admin or manager): Products > Add Product or Edit, click in the Barcode box and scan the packet, or type the number printed under the bars. One barcode belongs to one product; the form refuses a number already used by another item and names it. The Products list shows the barcode under each name.
+2. **Billing**: click in the search box (or press F2) and scan. The item is added with quantity 1, the row flashes, and the cursor stays in the search box for the next packet. Scanning the same packet again adds one more. A scan while the cursor is in a quantity or price box also works; the code is taken out of that box. Finish with F9 as usual.
+3. **Looking things up**: the Products, Stock, purchase and offer search boxes also match barcodes, so a packet can be scanned to check its stock or add it to a purchase.
+4. **Items without a barcode** (loose rice, vegetables) are billed by name as before. Self-printed labels work too: type the label's number into the Barcode box.
+
+If the number appears but nothing is added, the scanner is not sending Enter after the code: scan the "Add Enter (CR) suffix" code from the scanner's setting sheet. If strange characters appear, set the scanner to US English keyboard. Cashiers see these steps under Help > Barcode scanner; managers additionally see how to save barcodes.
 
 ## Roles
 

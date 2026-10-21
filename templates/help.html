@@ -15,6 +15,7 @@
   <a href="#billing">Billing a customer</a>
   <a href="#udhaar">Customers and udhaar (credit)</a>
   <a href="#stock">Products and stock</a>
+  <a href="#barcode">Barcode scanner</a>
   {% if is_mgr %}<a href="#purchases">Purchases (stock in)</a><a href="#offers">Offers</a>{% endif %}
   <a href="#notices">Notices</a>
   {% if is_mgr %}<a href="#messages">Branch messages and stock requests</a>{% endif %}
@@ -51,13 +52,14 @@
   <ol>
     <li>Open <strong>Billing</strong>. The cursor is already in the search box.</li>
     <li>Type part of the product name, pick it with the arrow keys, press <span class="kbd">Enter</span>. The item is added with quantity 1 and the cursor jumps to the quantity box.</li>
+    <li><strong>With a barcode scanner:</strong> click in the search box once, then scan the packet. The item is added with quantity 1 and the cursor stays in the search box, so scan the next packet straight away. Scanning the same packet again adds one more. A scan also works while the cursor is in a quantity box. If nothing is added, the packet's barcode is not saved on the product yet: a manager can add it under Products &gt; Edit.</li>
     <li>Type the quantity (decimals allowed for loose items, e.g. 0.250) and press <span class="kbd">Enter</span> to return to search. Press <span class="kbd">F2</span> any time to jump back to search.</li>
     <li>Items with a live offer show an <span class="offer-tag">OFFER</span> tag; the saving is applied automatically and shown in the totals.</li>
     <li>Optional: pick a customer by name or phone, or click <strong>+</strong> to add one. Needed only for credit bills or when the customer wants their name on the bill.</li>
     <li>Choose payment: <strong>Cash</strong>, <strong>UPI</strong>, <strong>Card</strong> or <strong>Credit</strong>. For cash you can type the amount received to see the change to return.</li>
     <li>Press <span class="kbd">F9</span> or click <strong>Save &amp; Print</strong>. The bill opens in a new tab in the format set for your branch (A4 or thermal) and the print dialog appears.</li>
   </ol>
-  <p class="hint">{% if role == 'cashier' %}Prices cannot be changed at the counter. If a price is wrong, tell your manager.{% else %}Managers and admin can adjust an item's price on the bill for special cases; the change is recorded in the activity log.{% endif %}
+  <p class="hint">Prices cannot be changed on the bill. {% if role == 'cashier' %}If a price is wrong, tell your manager.{% else %}If a price is wrong, correct it under Products &gt; Edit, or record the new purchase price under Purchases; the next bill uses the new price. Use the Discount box or an Offer for a special price.{% endif %}
   A manual discount can be typed in the Discount box. {% if is_admin %}Only admin can cancel a saved bill (Bills page), which restores stock.{% else %}If a bill was made by mistake, ask the admin to cancel it.{% endif %}</p>
   <p><strong>Reprint:</strong> Bills page, find the bill, click Print (branch format), 80 (thermal) or A4.</p>
 </section>
@@ -78,13 +80,46 @@
     <li><strong>Products</strong> lists every item with unit, HSN, GST rate, cost, selling price, MRP and current stock for your branch. Use the search box and category filter.</li>
     <li><strong>Stock</strong> shows quantities, alert levels, cost and sell price per item, and the total stock value. Tick "Low stock only" to see items at or below their alert level; the dashboard also counts them.</li>
     {% if is_mgr %}
-    <li><strong>Add or edit a product:</strong> Products &gt; Add Product or Edit. Selling price includes GST, the way MRP works. Set the low stock alert level per item.</li>
+    <li><strong>Add or edit a product:</strong> Products &gt; Add Product or Edit. Selling price includes GST, the way MRP works. Set the low stock alert level per item. Click in the <strong>Barcode</strong> box and scan the packet (or type the number printed under the bars); the cashier can then scan it at billing. One barcode belongs to one product.</li>
     <li><strong>Adjust</strong> on the Stock page is only for corrections: damaged, expired or a counting difference. Use a negative number to remove stock and always type a reason. Stock history shows every adjustment.</li>
     <li><strong>Transfer to branch</strong> moves stock from your branch to another and records it on both sides.</li>
     <li>Bought new stock, maybe at a new price? Do not use Adjust. Record a <a href="#purchases">Purchase</a>.</li>
     {% else %}
     <li>You can view products and stock but not change them. Report wrong stock or prices to your manager.</li>
     {% endif %}
+  </ul>
+</section>
+
+<section class="card" id="barcode">
+  <h2>Barcode scanner</h2>
+  <p>Any USB or Bluetooth barcode scanner works. It behaves like a keyboard: it types the number printed under the bars and then presses Enter. Nothing needs to be installed or set up in the system.</p>
+  <h3>Scanning at the billing counter</h3>
+  <ol>
+    <li>Open <strong>Billing</strong> and click in the search box once (or press <span class="kbd">F2</span>).</li>
+    <li>Scan the packet. The item appears on the bill with quantity 1, the row flashes green, and the cursor stays in the search box.</li>
+    <li>Scan the next packet. Scanning the same packet again adds one more of it. For loose items or large quantities, click the quantity box and type the number.</li>
+    <li>A scan also works while the cursor is in a quantity or price box: the code is taken out of that box and the item is added.</li>
+    <li>Finish the bill as usual with <span class="kbd">F9</span>.</li>
+  </ol>
+  {% if is_mgr %}
+  <h3>Saving the barcode on a product</h3>
+  <ol>
+    <li>Open <strong>Products</strong>, click <strong>Add Product</strong> or <strong>Edit</strong> on the item.</li>
+    <li>Click in the <strong>Barcode</strong> box and scan the packet. The number appears and the cursor moves to the next box. You can also type the number printed under the bars.</li>
+    <li>Save. From now on scanning that packet at billing adds this product.</li>
+    <li>One barcode belongs to one product. If the number is already saved on another product, the form says which one; scan the right packet or clear the box.</li>
+    <li>The Products list shows the barcode under each name. The Products, Stock and purchase search boxes find items by barcode too, so you can scan a packet to check its stock or add it to a purchase.</li>
+  </ol>
+  <p class="hint">Items without a printed barcode (loose rice, vegetables, bakery) are billed by name as before. If you print your own labels, type the number from the label into the Barcode box.</p>
+  {% else %}
+  <p class="hint">If a scan adds nothing, the barcode is not saved on that product yet. Bill it by name and tell your manager, who can add the barcode under Products.</p>
+  {% endif %}
+  <h3>If scanning does not work</h3>
+  <ul>
+    <li>Nothing happens: the cursor was not in the search box. Press <span class="kbd">F2</span> and scan again.</li>
+    <li>"No product found": the barcode is not saved on the product yet{% if is_mgr %}; add it under Products &gt; Edit{% endif %}.</li>
+    <li>The number appears in the box but the item is not added: the scanner is not sending Enter after the code. Most scanners have a setting sheet in the box; scan the "Add Enter / CR suffix" code on it.</li>
+    <li>Wrong characters appear: the scanner is set to another keyboard language. Set it to US English keyboard from its setting sheet.</li>
   </ul>
 </section>
 
@@ -282,6 +317,7 @@
   <dl class="faq">
     <dt>I cannot log in: "locked to another device".</dt><dd>Your account is bound to the first computer you used. Ask the {{ 'manager or admin' if role == 'cashier' else 'admin' }} to reset your device, then log in again from this computer.</dd>
     <dt>The bill did not print.</dt><dd>Open Bills, find the bill and click Print again. Check the printer is on and selected in the print dialog.</dd>
+    <dt>I scanned a packet but nothing was added.</dt><dd>Press <span class="kbd">F2</span> so the cursor is in the search box and scan again. If it says "No product found", the barcode is not saved on the product yet{{ ': ask your manager to add it.' if role == 'cashier' else ': open Products > Edit, click in the Barcode box and scan.' }} See the Barcode scanner section above.</dd>
     <dt>The product is not found while billing.</dt><dd>Try a shorter part of the name. If it is a new item, {{ 'ask your manager to add it under Products.' if role == 'cashier' else 'add it under Products > Add Product.' }}</dd>
     <dt>"Only X in stock" when billing.</dt><dd>The system has less stock than you are selling. {{ 'Tell your manager to check the stock.' if role == 'cashier' else 'Record the purchase or correct the stock with Adjust, then bill again.' }}</dd>
     <dt>A customer paid old udhaar.</dt><dd>Customers &gt; the customer &gt; Receive payment &gt; Save &amp; print receipt. Give them the receipt.</dd>

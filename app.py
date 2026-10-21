@@ -85,11 +85,15 @@ def migrate(db):
                        ("device_lock", "INTEGER NOT NULL DEFAULT 1"), ("bound_ip", "TEXT"), ("bound_at", "TEXT"),
                        ("can_reset_device", "INTEGER NOT NULL DEFAULT 0"), ("can_hr_docs", "INTEGER NOT NULL DEFAULT 0"),
                        ("failed_logins", "INTEGER NOT NULL DEFAULT 0"), ("locked_at", "TEXT")]
+    wanted["products"] = [("barcode", "TEXT")]
     for table, cols in wanted.items():
         have = {r[1] for r in db.execute(f"PRAGMA table_info({table})")}
         for name, ddl in cols:
             if name not in have:
                 db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+    # one barcode = one active product (a removed product may be re-added with the same code)
+    db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode) "
+               "WHERE barcode IS NOT NULL AND barcode <> '' AND active=1")
 
 
 def init_db():
@@ -492,8 +496,8 @@ def products():
            "LEFT JOIN stock s ON s.product_id=p.id AND s.branch_id=? WHERE p.active=1")
     params = [branch_id()]
     if s:
-        sql += " AND p.name LIKE ?"
-        params.append(f"%{s}%")
+        sql += " AND (p.name LIKE ? OR p.barcode LIKE ?)"
+        params += [f"%{s}%", f"%{s}%"]
     if cat:
         sql += " AND p.category_id=?"
         params.append(cat)
@@ -506,15 +510,26 @@ def product_form_values():
     f = request.form
     return (f["name"].strip(), f.get("category_id") or None, f.get("unit", "pcs"), f.get("hsn", "").strip(),
             float(f.get("gst_rate") or 0), float(f.get("purchase_price") or 0), float(f.get("selling_price") or 0),
-            float(f["mrp"]) if f.get("mrp") else None, float(f.get("low_stock_level") or 5))
+            float(f["mrp"]) if f.get("mrp") else None, float(f.get("low_stock_level") or 5),
+            f.get("barcode", "").strip() or None)
+
+
+def barcode_owner(code):
+    """Name of the active product already using this barcode, if any."""
+    r = q("SELECT name FROM products WHERE barcode=? AND active=1", (code,), one=True) if code else None
+    return r["name"] if r else None
 
 
 @app.route("/products/new", methods=["GET", "POST"])
 @role_required("admin", "manager")
 def product_new():
     if request.method == "POST":
-        pid = run("INSERT INTO products(name,category_id,unit,hsn,gst_rate,purchase_price,selling_price,mrp,low_stock_level) "
-                  "VALUES (?,?,?,?,?,?,?,?,?)", product_form_values())
+        owner = barcode_owner(request.form.get("barcode", "").strip())
+        if owner:
+            flash(f"That barcode is already saved on \"{owner}\". Scan the right packet or clear the barcode box.", "error")
+            return render_template("product_form.html", p=request.form, categories=q("SELECT * FROM categories ORDER BY name"))
+        pid = run("INSERT INTO products(name,category_id,unit,hsn,gst_rate,purchase_price,selling_price,mrp,low_stock_level,barcode) "
+                  "VALUES (?,?,?,?,?,?,?,?,?,?)", product_form_values())
         opening = float(request.form.get("opening_stock") or 0)
         if opening:
             run("INSERT INTO stock(product_id,branch_id,quantity) VALUES (?,?,?)", (pid, branch_id(), opening))
@@ -533,8 +548,13 @@ def product_new():
 def product_edit(pid):
     p = q("SELECT * FROM products WHERE id=?", (pid,), one=True) or abort(404)
     if request.method == "POST":
+        code = request.form.get("barcode", "").strip()
+        owner = barcode_owner(code) if code and code != (p["barcode"] or "") else None
+        if owner:
+            flash(f"That barcode is already saved on \"{owner}\". Scan the right packet or clear the barcode box.", "error")
+            return redirect(url_for("product_edit", pid=pid))
         run("UPDATE products SET name=?,category_id=?,unit=?,hsn=?,gst_rate=?,purchase_price=?,selling_price=?,mrp=?,"
-            "low_stock_level=? WHERE id=?", product_form_values() + (pid,))
+            "low_stock_level=?,barcode=? WHERE id=?", product_form_values() + (pid,))
         get_db().commit()
         flash("Product updated.", "success")
         return redirect(url_for("products"))
@@ -589,8 +609,8 @@ def stock():
            "WHERE p.active=1")
     params = [branch_id()]
     if s:
-        sql += " AND p.name LIKE ?"
-        params.append(f"%{s}%")
+        sql += " AND (p.name LIKE ? OR p.barcode LIKE ?)"
+        params += [f"%{s}%", f"%{s}%"]
     if only_low:
         sql += " AND COALESCE(s.quantity,0) <= p.low_stock_level"
     sql += " ORDER BY p.name"
@@ -1078,10 +1098,11 @@ def billing():
 @login_required
 def api_product_search():
     s = request.args.get("q", "").strip()
-    rows = q("SELECT p.id,p.name,p.unit,p.selling_price,p.mrp,p.gst_rate,p.hsn,p.category_id,COALESCE(s.quantity,0) AS qty "
+    rows = q("SELECT p.id,p.name,p.unit,p.selling_price,p.mrp,p.gst_rate,p.hsn,p.category_id,p.barcode,COALESCE(s.quantity,0) AS qty "
              "FROM products p LEFT JOIN stock s ON s.product_id=p.id AND s.branch_id=? "
-             "WHERE p.active=1 AND p.name LIKE ? ORDER BY CASE WHEN p.name LIKE ? THEN 0 ELSE 1 END, p.name LIMIT 15",
-             (branch_id(), f"%{s}%", f"{s}%"))
+             "WHERE p.active=1 AND (p.name LIKE ? OR p.barcode LIKE ?) "
+             "ORDER BY CASE WHEN p.barcode=? THEN 0 WHEN p.name LIKE ? THEN 1 ELSE 2 END, p.name LIMIT 15",
+             (branch_id(), f"%{s}%", f"%{s}%", s, f"{s}%"))
     return jsonify([dict(r) for r in rows])
 
 
@@ -1141,11 +1162,7 @@ def api_sale_create():
         if not p:
             return jsonify(ok=False, error="Unknown product."), 400
         qty = float(it["quantity"])
-        user = current_user()
-        if user["role"] == "cashier":
-            price = float(p["selling_price"])             # cashiers cannot change prices; server ignores any edited value
-        else:
-            price = float(it.get("unit_price") or p["selling_price"])
+        price = float(p["selling_price"])                 # the bill always uses the product's selling price; any edited value is ignored
         if qty <= 0:
             return jsonify(ok=False, error=f"Invalid quantity for {p['name']}."), 400
         if not allow_neg and p["qty"] < qty:

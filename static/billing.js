@@ -8,20 +8,31 @@ const fmt = n => '₹' + n.toFixed(2);
 
 // ---------- product search ----------
 const search = $('search'), sug = $('suggest');
-let timer, results = [], sel = -1;
+let timer, results = [], sel = -1, lastQuery = '';
 search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(doSearch, 120); });
 search.addEventListener('keydown', e => {
   if (e.key === 'ArrowDown') { sel = Math.min(sel + 1, results.length - 1); paint(); e.preventDefault(); }
   else if (e.key === 'ArrowUp') { sel = Math.max(sel - 1, 0); paint(); e.preventDefault(); }
-  else if (e.key === 'Enter') { if (results[sel]) addItem(results[sel]); e.preventDefault(); }
+  else if (e.key === 'Enter') { e.preventDefault(); enterSearch(); }
   else if (e.key === 'Escape') hide();
 });
 async function doSearch() {
   const qv = search.value.trim();
   if (!qv) return hide();
   results = await (await fetch('/api/products/search?q=' + encodeURIComponent(qv))).json();
+  lastQuery = qv;
   sel = results.length ? 0 : -1;
   paint();
+}
+async function enterSearch() {
+  const v = search.value.trim();
+  if (!v) return;
+  clearTimeout(timer);
+  if (v !== lastQuery) await doSearch();            // a scanner sends Enter before the search delay has fired
+  if (search.value.trim() !== v) return;            // user kept typing meanwhile
+  const exact = results.find(p => p.barcode && p.barcode === v);
+  if (exact) addItem(exact, true);                  // scanned: keep the cursor here for the next packet
+  else if (results[sel]) addItem(results[sel]);
 }
 function paint() {
   sug.innerHTML = results.map((p, i) =>
@@ -35,15 +46,37 @@ function hide() { sug.style.display = 'none'; sel = -1; }
 document.addEventListener('click', e => { if (!e.target.closest('.search-box')) { hide(); $('csuggest').style.display = 'none'; } });
 
 // ---------- cart ----------
-function addItem(p) {
+function addItem(p, scanned) {
   const ex = cart.find(r => r.product_id === p.id);
   if (ex) ex.quantity += 1;
   else cart.push({ product_id: p.id, name: p.name, unit: p.unit, gst_rate: p.gst_rate, category_id: p.category_id, stock: p.qty, quantity: 1, unit_price: p.selling_price });
-  search.value = ''; hide(); render();
-  const qtyInputs = document.querySelectorAll('#items tbody input.qty');
+  search.value = ''; lastQuery = ''; hide(); render();
   const idx = cart.findIndex(r => r.product_id === p.id);
+  const row = document.querySelectorAll('#items tbody tr')[idx];
+  if (row) { row.classList.add('just-added'); setTimeout(() => row.classList.remove('just-added'), 900); }
+  if (scanned) { search.focus(); return; }
+  const qtyInputs = document.querySelectorAll('#items tbody input.qty');
   if (qtyInputs[idx]) { qtyInputs[idx].focus(); qtyInputs[idx].select(); }
 }
+
+// ---------- barcode scanner while the cursor is somewhere else ----------
+// A scanner types the whole code in a few milliseconds and ends with Enter. If that lands in a
+// quantity or price box, take the code back out of that box and add the scanned item instead.
+let burst = '', burstAt = 0, burstTarget = null, burstBefore = '';
+document.addEventListener('keydown', e => {
+  if (e.target === search || e.altKey || e.ctrlKey || e.metaKey) return;
+  const now = Date.now();
+  if (e.key.length === 1) {
+    if (now - burstAt > 60) { burst = ''; burstTarget = e.target; burstBefore = (e.target && 'value' in e.target) ? e.target.value : ''; }
+    burst += e.key; burstAt = now; return;
+  }
+  if (e.key === 'Enter' && burst.length >= 4 && now - burstAt < 60) {
+    const code = burst; burst = '';
+    e.preventDefault(); e.stopPropagation();
+    if (burstTarget && 'value' in burstTarget) { burstTarget.value = burstBefore; burstTarget.dispatchEvent(new Event('input')); }
+    search.value = code; enterSearch();
+  } else if (e.key === 'Enter') burst = '';
+}, true);
 function render() {
   const tb = document.querySelector('#items tbody');
   if (!cart.length) { tb.innerHTML = '<tr><td colspan="9" class="empty">Search a product above to start the bill.</td></tr>'; calc(); return; }

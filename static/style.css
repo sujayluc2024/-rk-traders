@@ -356,3 +356,9 @@ html[data-theme="dark"] .login-logo { background: #fff; border-radius: 12px; pad
 .locked-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid color-mix(in srgb, var(--danger) 25%, transparent); }
 .locked-row:first-of-type { border-top: none; }
 @media (min-width: 1100px) { .users-grid { grid-template-columns: 3fr 2fr; } }
+
+/* ---------------- Barcode ---------------- */
+.barcode { font-family: Consolas, "Courier New", monospace; letter-spacing: .05em; }
+input.barcode { font-size: 17px; }
+@keyframes row-added { from { background: var(--tint); } to { background: transparent; } }
+tr.just-added td { animation: row-added .9s ease-out; }

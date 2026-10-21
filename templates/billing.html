@@ -6,10 +6,10 @@
   <div>
     <div class="card">
       <div class="search-box">
-        <input type="text" id="search" placeholder="Type product name and press Enter..." autocomplete="off" autofocus>
+        <input type="text" id="search" placeholder="Type product name or scan barcode, then Enter..." autocomplete="off" autofocus>
         <div class="suggest" id="suggest" style="display:none"></div>
       </div>
-      <p class="hint" style="margin:8px 0 0"><span class="kbd">↑</span> <span class="kbd">↓</span> choose &nbsp; <span class="kbd">Enter</span> add item &nbsp; <span class="kbd">F2</span> back to search &nbsp; <span class="kbd">F9</span> save &amp; print</p>
+      <p class="hint" style="margin:8px 0 0"><span class="kbd">↑</span> <span class="kbd">↓</span> choose &nbsp; <span class="kbd">Enter</span> add item &nbsp; <span class="kbd">&#9646;&#9647;&#9646; scan</span> adds item, stays here &nbsp; <span class="kbd">F2</span> back to search &nbsp; <span class="kbd">F9</span> save &amp; print</p>
     </div>
     <div class="card table-wrap">
       <table id="items">
@@ -57,4 +57,4 @@
   </div>
 </div>
 {% endblock %}
-{% block scripts %}<script>const CAN_EDIT_PRICE = {{ 'true' if current_user.role in ['admin','manager'] else 'false' }};</script><script src="{{ url_for('static', filename='billing.js') }}"></script>{% endblock %}
+{% block scripts %}<script>const CAN_EDIT_PRICE = false;   // prices come from the product record for every role; change them under Products</script><script src="{{ url_for('static', filename='billing.js') }}"></script>{% endblock %}

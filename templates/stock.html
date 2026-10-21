@@ -5,7 +5,7 @@
 <div class="toolbar">
   <h1>{{ 'Low stock items' if only_low else 'Stock' }} <small class="hint">{{ current_branch.name }}</small></h1>
   <form method="get">
-    <input type="search" name="q" value="{{ search }}" placeholder="Search item...">
+    <input type="search" name="q" value="{{ search }}" placeholder="Search item or barcode...">
     <label class="checkbox"><input type="checkbox" name="low" value="1" {{ 'checked' if only_low }}> Low stock only</label>
     <button class="btn btn-outline">Filter</button>
   </form>
