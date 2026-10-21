@@ -112,9 +112,12 @@ const D = {{ data_json|safe }};
 const C = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
 const inr = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 Chart.defaults.font.family = 'Segoe UI, system-ui, sans-serif';
-Chart.defaults.color = '#52514e';
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const gridColor = () => css('--border');
+Chart.defaults.color = css('--muted');
+window.addEventListener('rk-theme', () => { Chart.defaults.color = css('--muted'); Object.values(Chart.instances).forEach(c => c.update()); });
 const base = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + (c.dataset.money === false ? c.formattedValue : inr(c.parsed.y ?? c.parsed.x)) } } },
-  scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#eef1f4' }, ticks: { callback: v => inr(v) } } } };
+  scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: gridColor }, ticks: { callback: v => inr(v) } } } };
 const bar = { borderRadius: 4, borderSkipped: 'start', maxBarThickness: 36 };
 function mk(id, cfg) { const el = document.getElementById(id); if (el) new Chart(el, cfg); }
 
@@ -138,13 +141,13 @@ mk('monthly', { type: 'bar', data: { labels: D.monthly.map(r => r.month), datase
 mk('branches', { type: 'bar', data: { labels: D.branches.map(r => r.name), datasets: [
   { label: 'This period', data: D.branches.map(r => r.sales), backgroundColor: C[0], ...bar },
   { label: 'Previous period', data: D.branches.map(r => r.prev_sales), backgroundColor: '#c3c2b7', ...bar }] }, options: base });
-const horiz = { ...base, indexAxis: 'y', scales: { x: { beginAtZero: true, grid: { color: '#eef1f4' }, ticks: { callback: v => inr(v) } }, y: { grid: { display: false } } }, plugins: { ...base.plugins, legend: { display: false } } };
+const horiz = { ...base, indexAxis: 'y', scales: { x: { beginAtZero: true, grid: { color: gridColor }, ticks: { callback: v => inr(v) } }, y: { grid: { display: false } } }, plugins: { ...base.plugins, legend: { display: false } } };
 mk('products', { type: 'bar', data: { labels: D.top_products.map(r => r.name), datasets: [{ label: 'Sales', data: D.top_products.map(r => r.sales), backgroundColor: C[0], ...bar }] }, options: horiz });
 mk('categories', { type: 'bar', data: { labels: D.categories.map(r => r.category), datasets: [{ label: 'Sales', data: D.categories.map(r => r.sales), backgroundColor: C[1], ...bar }] }, options: horiz });
 mk('payments', { type: 'bar', data: { labels: D.payments.map(r => r.mode), datasets: [{ label: 'Amount', data: D.payments.map(r => r.amount), backgroundColor: D.payments.map((r, i) => C[i]), ...bar }] }, options: horiz });
 {
   const hours = Array.from({ length: 24 }, (_, h) => h);
-  const count = { ...base, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#eef1f4' }, ticks: { precision: 0 } } }, plugins: { ...base.plugins, legend: { display: false }, tooltip: { callbacks: { label: c => c.formattedValue + ' bills' } } } };
+  const count = { ...base, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: gridColor }, ticks: { precision: 0 } } }, plugins: { ...base.plugins, legend: { display: false }, tooltip: { callbacks: { label: c => c.formattedValue + ' bills' } } } };
   mk('hourly', { type: 'bar', data: { labels: hours.map(h => String(h).padStart(2, '0') + ':00'), datasets: [{ label: 'Bills', money: false, data: hours.map(h => (D.hourly.find(r => r.hour === h) || {}).bills || 0), backgroundColor: C[2], ...bar }] }, options: count });
 }
 {

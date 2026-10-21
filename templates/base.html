@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo-mark.svg') }}">
 <script>try{if(localStorage.getItem("rk_nav")==="collapsed")document.documentElement.classList.add("nav-collapsed");}catch(e){}</script>
+<script>try{if(localStorage.getItem("rk_theme")==="dark")document.documentElement.setAttribute("data-theme","dark");}catch(e){}</script>
 {% block head %}{% endblock %}
 </head>
 <body class="{{ 'has-sidebar' if current_user }}">
@@ -94,6 +95,7 @@
     <span class="pill">{{ current_branch.name if current_branch }}</span>
     {% endif %}
     <a class="pill" href="{{ url_for('select_counter') }}" title="Change counter">{{ current_counter.code if current_counter else 'No counter' }}</a>
+    <button type="button" class="theme-btn" onclick="toggleTheme()" title="Switch light / dark theme" aria-label="Switch light / dark theme"><span class="moon">&#9790;</span><span class="sun">&#9728;</span></button>
     <a href="{{ url_for('billing') }}" class="btn btn-sm btn-accent">+ New Bill</a>
   </div>
 </header>
@@ -120,6 +122,24 @@
 })();
 function toggleSidebar() {
   if (window.innerWidth > 900) collapseSidebar(); else document.body.classList.toggle('nav-open');
+}
+(function () {   // eye button on every password box
+  document.querySelectorAll('input[type=password]').forEach(inp => {
+    if (inp.closest('.pw-wrap')) return;
+    const wrap = document.createElement('span'); wrap.className = 'pw-wrap';
+    inp.parentNode.insertBefore(wrap, inp); wrap.appendChild(inp);
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'pw-eye'; btn.tabIndex = -1;
+    btn.title = 'Show password'; btn.setAttribute('aria-label', 'Show password'); btn.innerHTML = '&#128065;';
+    btn.onclick = () => { const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; btn.classList.toggle('on', show);
+      btn.title = btn.getAttribute('aria-label') === 'Show password' && show ? 'Hide password' : 'Show password'; inp.focus(); };
+    wrap.appendChild(btn);
+  });
+})();
+function toggleTheme() {
+  const dark = document.documentElement.getAttribute('data-theme') !== 'dark';
+  if (dark) document.documentElement.setAttribute('data-theme', 'dark'); else document.documentElement.removeAttribute('data-theme');
+  try { localStorage.setItem('rk_theme', dark ? 'dark' : 'light'); } catch (e) {}
+  window.dispatchEvent(new CustomEvent('rk-theme', { detail: { dark } }));
 }
 function collapseSidebar() {
   const on = document.documentElement.classList.toggle('nav-collapsed');

@@ -3,12 +3,15 @@
 {% block container_class %}login-wrap{% if settings.login_bg_file %} has-bg{% endif %}{% endblock %}
 {% block head %}{% if settings.login_bg_file %}<style>.login-wrap.has-bg { background-image: linear-gradient(rgba(11,26,77,.55), rgba(11,26,77,.55)), url("{{ url_for('login_bg_image') }}?v={{ settings.login_bg_file }}"); }</style>{% endif %}{% endblock %}
 {% block content %}
+<div class="login-fx" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
+<button type="button" class="theme-btn login-theme" onclick="toggleTheme()" title="Switch light / dark theme" aria-label="Switch light / dark theme"><span class="moon">&#9790;</span><span class="sun">&#9728;</span></button>
 <div class="login-box">
   <img src="{{ url_for('static', filename='logo.svg') }}" alt="{{ settings.shop_name }}" class="login-logo">
   <form method="post">
-    <div class="field"><label>Username</label><input type="text" name="username" required autofocus></div>
-    <div class="field"><label>Password</label><input type="password" name="password" required></div>
-    <button class="btn btn-lg">Login</button>
+    <div class="field"><label>Username</label><input type="text" name="username" required autofocus autocomplete="username"></div>
+    <div class="field"><label>Password</label><input type="password" name="password" required autocomplete="current-password"></div>
+    <button class="btn btn-lg login-btn">Login</button>
   </form>
+  <p class="login-foot">{{ settings.shop_name }}</p>
 </div>
 {% endblock %}

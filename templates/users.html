@@ -2,11 +2,23 @@
 {% block title %}Users{% endblock %}
 {% block content %}
 <div class="toolbar"><h1>{{ 'Users' if is_admin else 'Cashiers of ' ~ current_branch.name }}</h1>{% if is_admin %}<a href="{{ url_for('settings_page') }}" class="btn btn-outline">Back to settings</a>{% endif %}</div>
-<div class="grid grid-2">
+{% set locked = users|selectattr('locked_at')|list %}
+{% if locked %}
+<div class="card locked-banner">
+  <h2>&#128274; Locked account{{ 's' if locked|length > 1 }}</h2>
+  {% for u in locked %}
+  <div class="locked-row"><span><strong>{{ u.full_name }}</strong> ({{ u.username }}) is locked after 3 wrong passwords, since {{ u.locked_at }}.</span>
+    <form method="post" action="{{ url_for('user_unlock', uid=u.id) }}" onsubmit="return confirm('Unlock {{ u.full_name }}? They can log in again straight away.')"><button class="btn btn-accent">&#128275; Unlock</button></form></div>
+  {% endfor %}
+</div>
+{% endif %}
+<div class="grid grid-2 users-grid">
   <div class="card table-wrap">
     <table><tr><th>Emp ID</th><th>Username</th><th>Name</th><th>Role / designation</th><th>Branch</th><th>Joined</th><th>Device</th><th></th></tr>
     {% for u in users %}
-    <tr><td><code>{{ u.emp_code or '-' }}</code></td><td><strong>{{ u.username }}</strong>{% if not u.active %} <span class="tag">inactive</span>{% endif %}</td><td>{{ u.full_name }}</td>
+    <tr><td><code>{{ u.emp_code or '-' }}</code></td><td><strong>{{ u.username }}</strong>{% if not u.active %} <span class="tag">inactive</span>{% endif %}
+            {% if u.locked_at %}<br><span class="tag credit" title="locked at {{ u.locked_at }}">&#128274; locked</span> <form method="post" action="{{ url_for('user_unlock', uid=u.id) }}" style="display:inline" onsubmit="return confirm('Unlock {{ u.full_name }}? They can log in again straight away.')"><button class="btn btn-sm btn-accent">Unlock</button></form>
+            {% elif u.failed_logins %}<br><span class="tag st-open" title="wrong password {{ u.failed_logins }} time(s), locks at 3">{{ u.failed_logins }} wrong pw</span>{% endif %}</td><td>{{ u.full_name }}</td>
         <td><span class="tag">{{ u.role }}</span>{% if u.designation %} {{ u.designation }}{% endif %}{% if u.can_manage_users %}<br><small class="hint">can add cashiers</small>{% endif %}{% if u.can_view_analytics %}<br><small class="hint">analytics access</small>{% endif %}{% if u.can_reset_device %}<br><small class="hint">can reset devices</small>{% endif %}{% if u.can_hr_docs %}<br><small class="hint">HR documents</small>{% endif %}</td>
         <td>{{ u.branch_name or 'All branches' }}</td><td>{{ u.joining_date or '-' }}</td>
         <td>{% if not u.device_lock %}<span class="hint">not locked</span>{% elif u.bound_ip %}<span class="tag cash" title="since {{ u.bound_at }}">{{ u.bound_ip }}</span>
@@ -49,6 +61,7 @@
       <button class="btn">Save</button> <button type="button" class="btn btn-outline" onclick="editUser()">Clear</button>
     </form>
     <p class="hint">{% if is_admin %}Cashiers and managers belong to one branch and can only see that branch. Admins see all branches.{% else %}New users are created as cashiers of your branch. Untick Active to stop someone logging in.{% endif %} The Employee ID is generated automatically; the prefix and the designation list are set under Settings.</p>
+    <p class="hint"><strong>Login lock:</strong> three wrong passwords in a row lock the account. A locked user is shown in a red banner at the top of this page and under their username, with an Unlock button{% if is_admin %}; a manager who may add cashiers can unlock cashiers of their own branch{% endif %}. A correct login clears the count. Admin accounts unlock by themselves after 15 minutes so the shop can never be locked out completely.</p>
     <p class="hint"><strong>Device lock:</strong> the first login saves the computer's network address. A login from another address is refused with a message. If a computer is replaced or its address changes, click <em>reset</em> next to the user. Give each counter PC a fixed address in your router so the lock stays reliable.</p>
   </div>
 </div>

@@ -36,9 +36,10 @@
 <section class="card" id="start">
   <h2>Getting started</h2>
   <ol>
-    <li><strong>Log in</strong> with the username and password given to you. Your account is locked to the first computer you log in from. If you must use another computer, ask the manager or admin to reset your device.</li>
+    <li><strong>Log in</strong> with the username and password given to you. Your account is locked to the first computer you log in from. If you must use another computer, ask the manager or admin to reset your device. Click the eye icon in the password box to see what you typed. Three wrong passwords in a row lock the account; the admin, or your branch manager if they may add cashiers, can unlock it from the Users page.</li>
     <li><strong>Choose your billing counter</strong> on the next screen. Every bill you make is numbered under that counter. You can change counter from the top bar.</li>
     <li>The <strong>left menu</strong> holds everything. Click the arrows at the top of the menu to shrink it to icons. On a phone, tap the menu button in the top bar.</li>
+    <li><strong>Light or dark theme</strong>: click the moon / sun button in the top bar to switch. The choice is remembered on this computer and browser.</li>
     <li><strong>Notice popups</strong> appear when the office sends you a notice. Read it and click "I have read this". It will keep coming back until you do.</li>
     <li><strong>Log out</strong> from the bottom of the menu when you leave the counter. Your login and logout times are recorded.</li>
     <li>To change your password, click the key icon at the bottom of the menu.</li>
@@ -212,9 +213,11 @@
     <li><strong>Add a user:</strong> Users &gt; fill username, name, role (cashier, manager, admin), branch, designation (dropdown), joining date and password. The employee ID is assigned automatically.</li>
     <li><strong>Permissions for managers:</strong> create cashier users; reset device locks; manage HR documents; view analytics. Tick what each manager may do.</li>
     <li><strong>Device lock:</strong> on by default for cashiers and managers; the first login binds the computer. Untick to allow any computer.</li>
+    <li><strong>Login lock:</strong> three wrong passwords in a row lock any account. A locked user appears in a red banner at the top of the Users page; click Unlock there. Managers allowed to add cashiers can unlock their own branch's cashiers. Admin accounts unlock by themselves after 15 minutes.</li>
     <li>Untick <strong>Active</strong> to stop someone logging in without deleting their history.</li>
     {% else %}
     <li><strong>Cashier users:</strong> you can add cashiers for your branch, change their name, reset their password, set the joining date, and deactivate them. Role and branch are fixed.</li>
+    <li><strong>Locked cashier:</strong> three wrong passwords lock a cashier out. A red banner at the top of Cashier users names them; click Unlock and they can try again.</li>
     {% endif %}
   </ul>
 </section>

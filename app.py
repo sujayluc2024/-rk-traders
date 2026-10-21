@@ -83,7 +83,8 @@ def migrate(db):
     wanted["users"] = [("joining_date", "TEXT"), ("can_manage_users", "INTEGER NOT NULL DEFAULT 0"),
                        ("can_view_analytics", "INTEGER NOT NULL DEFAULT 0"),
                        ("device_lock", "INTEGER NOT NULL DEFAULT 1"), ("bound_ip", "TEXT"), ("bound_at", "TEXT"),
-                       ("can_reset_device", "INTEGER NOT NULL DEFAULT 0"), ("can_hr_docs", "INTEGER NOT NULL DEFAULT 0")]
+                       ("can_reset_device", "INTEGER NOT NULL DEFAULT 0"), ("can_hr_docs", "INTEGER NOT NULL DEFAULT 0"),
+                       ("failed_logins", "INTEGER NOT NULL DEFAULT 0"), ("locked_at", "TEXT")]
     for table, cols in wanted.items():
         have = {r[1] for r in db.execute(f"PRAGMA table_info({table})")}
         for name, ddl in cols:
@@ -307,13 +308,39 @@ def branch_id():
     return session.get("branch_id")
 
 
+MAX_LOGIN_ATTEMPTS = 3
+ADMIN_LOCK_MINUTES = 15          # admin accounts unlock by themselves, so the shop can never be fully locked out
+
+
+def account_locked(user):
+    """True if the account is locked. Admin locks expire after ADMIN_LOCK_MINUTES; others wait for an unlock."""
+    if not user["locked_at"]:
+        return False
+    if user["role"] == "admin":
+        locked = datetime.strptime(user["locked_at"], "%Y-%m-%d %H:%M:%S")
+        if datetime.now() - locked > timedelta(minutes=ADMIN_LOCK_MINUTES):
+            run("UPDATE users SET failed_logins=0, locked_at=NULL WHERE id=?", (user["id"],))
+            get_db().commit()
+            return False
+    return True
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         user = q("SELECT * FROM users WHERE username=? AND active=1",
                  (request.form["username"].strip().lower(),), one=True)
+        if user and account_locked(user):
+            g.audit_note = f"Locked account: {user['username']} (locked at {user['locked_at']})"
+            if user["role"] == "admin":
+                flash(f"This account is locked after {MAX_LOGIN_ATTEMPTS} wrong passwords. Try again after {ADMIN_LOCK_MINUTES} minutes.", "error")
+            else:
+                flash(f"This account is locked after {MAX_LOGIN_ATTEMPTS} wrong passwords. Ask the admin or your branch manager to unlock it.", "error")
+            return render_template("login.html")
         if user and check_password_hash(user["password_hash"], request.form["password"]):
             ip = request.remote_addr or "unknown"
+            if user["failed_logins"]:
+                run("UPDATE users SET failed_logins=0, locked_at=NULL WHERE id=?", (user["id"],))
             if user["device_lock"]:
                 if user["bound_ip"] and user["bound_ip"] != ip:
                     g.audit_note = f"Device lock: account bound to {user['bound_ip']}, attempt from {ip}"
@@ -337,7 +364,21 @@ def login():
                 (user["id"], session["branch_id"], request.remote_addr, (request.user_agent.string or "")[:200]))
             get_db().commit()
             return redirect(url_for("select_counter"))
-        flash("Wrong username or password.", "error")
+        if user:
+            tries = user["failed_logins"] + 1
+            if tries >= MAX_LOGIN_ATTEMPTS:
+                run("UPDATE users SET failed_logins=?, locked_at=datetime('now','localtime') WHERE id=?", (tries, user["id"]))
+                get_db().commit()
+                g.audit_note = f"Account locked after {tries} wrong passwords"
+                who = f"Try again after {ADMIN_LOCK_MINUTES} minutes." if user["role"] == "admin" else "Ask the admin or your branch manager to unlock it."
+                flash(f"Wrong password {tries} times. This account is now locked. {who}", "error")
+            else:
+                run("UPDATE users SET failed_logins=? WHERE id=?", (tries, user["id"]))
+                get_db().commit()
+                left = MAX_LOGIN_ATTEMPTS - tries
+                flash(f"Wrong username or password. {left} attempt{'s' if left != 1 else ''} left before the account is locked.", "error")
+        else:
+            flash("Wrong username or password.", "error")
     return render_template("login.html")
 
 
@@ -1751,6 +1792,23 @@ def users():
                            designations=designation_list(), next_code=next_emp_code())
 
 
+@app.route("/users/<int:uid>/unlock", methods=["POST"])
+@login_required
+def user_unlock(uid):
+    """Clear a lockout. Admin: anyone. Manager with 'create cashier users' permission: cashiers of own branch."""
+    u = current_user()
+    target = q("SELECT * FROM users WHERE id=?", (uid,), one=True) or abort(404)
+    allowed = u["role"] == "admin" or (u["role"] == "manager" and u["can_manage_users"] and target["role"] == "cashier"
+                                       and target["branch_id"] == u["branch_id"])
+    if not allowed:
+        abort(403)
+    run("UPDATE users SET failed_logins=0, locked_at=NULL WHERE id=?", (uid,))
+    get_db().commit()
+    g.audit_note = f"Unlocked {target['username']}"
+    flash(f"{target['full_name']} is unlocked and can log in again.", "success")
+    return redirect(request.referrer or url_for("users"))
+
+
 @app.route("/users/<int:uid>/reset-device", methods=["POST"])
 @login_required
 def user_reset_device(uid):
@@ -2573,7 +2631,12 @@ def record_activity(response):
         if getattr(g, "audit_note", None):
             details["note"] = g.audit_note
         if ep == "login":
-            action = "Login" if response.status_code == 302 else ("Login BLOCKED (device)" if getattr(g, "audit_note", "").startswith("Device lock") else "Login FAILED")
+            note = getattr(g, "audit_note", "") or ""
+            action = "Login" if response.status_code == 302 else ("Login BLOCKED (device)" if note.startswith("Device lock")
+                                                                  else "Login BLOCKED (locked)" if note.startswith("Locked account")
+                                                                  else "Login FAILED, account LOCKED" if note.startswith("Account locked") else "Login FAILED")
+        elif ep == "user_unlock":
+            action = "Unlocked user account"
         elif ep == "leave_document":
             action = "Uploaded leave document" if request.method == "POST" else "Viewed leave document"
         elif ep == "purchase_bill":
