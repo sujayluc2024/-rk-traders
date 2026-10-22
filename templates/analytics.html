@@ -116,7 +116,7 @@ const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).
 const gridColor = () => css('--border');
 Chart.defaults.color = css('--muted');
 window.addEventListener('rk-theme', () => { Chart.defaults.color = css('--muted'); Object.values(Chart.instances).forEach(c => c.update()); });
-const base = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + (c.dataset.money === false ? c.formattedValue : inr(c.parsed.y ?? c.parsed.x)) } } },
+const base = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + (c.dataset.money === false ? c.formattedValue : inr(c.chart.options.indexAxis === 'y' ? c.parsed.x : c.parsed.y)) } } },
   scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: gridColor }, ticks: { callback: v => inr(v) } } } };
 const bar = { borderRadius: 4, borderSkipped: 'start', maxBarThickness: 36 };
 function mk(id, cfg) { const el = document.getElementById(id); if (el) new Chart(el, cfg); }
