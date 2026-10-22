@@ -16,6 +16,7 @@
   <a href="#udhaar">Customers and udhaar (credit)</a>
   <a href="#stock">Products and stock</a>
   <a href="#barcode">Barcode scanner</a>
+  <a href="#display">Customer display</a>
   {% if is_mgr %}<a href="#purchases">Purchases (stock in)</a><a href="#offers">Offers</a>{% endif %}
   <a href="#notices">Notices</a>
   {% if is_mgr %}<a href="#messages">Branch messages and stock requests</a>{% endif %}
@@ -88,6 +89,18 @@
     <li>You can view products and stock but not change them. Report wrong stock or prices to your manager.</li>
     {% endif %}
   </ul>
+</section>
+
+<section class="card" id="display">
+  <h2>Customer display</h2>
+  <p>A second screen facing the customer that shows the bill as it is made: each item with quantity and price, offer savings, and the total in large figures. After Save &amp; Print it shows "Thank you", the amount paid and the change to return for ten seconds, then returns to the welcome screen.</p>
+  <ol>
+    <li>On the billing screen click <strong>Customer display</strong> (top right of the search card). It opens in a new window for your counter.</li>
+    <li><strong>Second monitor on the same PC:</strong> drag that window onto the customer's monitor and double-click it for full screen. Windows: Settings &gt; Display &gt; Extend these displays. Double-click again to leave full screen.</li>
+    <li><strong>Tablet or another screen on the shop Wi-Fi:</strong> open the same address on it, for example <code>http://192.168.1.5:5000/display/1</code>, where the number is the counter. No login is needed and it shows nothing but the bill. Add <code>?theme=light</code> to the address for a light screen; it is dark by default.</li>
+    <li>Keep the billing tab open on the cashier's PC; the display follows it. A red dot at the bottom of the display means it has lost the connection and is retrying.</li>
+    <li><strong>Several counters:</strong> each counter runs in its own browser (normally its own PC). One browser holds one login and one counter, so two billing tabs in the same browser are the same counter. To test two counters on one PC, use two different browsers (for example Edge and Chrome) or an InPrivate window for the second one.</li>
+  </ol>
 </section>
 
 <section class="card" id="barcode">

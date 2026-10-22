@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ settings.shop_name }} - Customer display {{ counter.code }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo-mark.svg') }}">
+<script>
+try {
+  const t = new URLSearchParams(location.search).get('theme') || localStorage.getItem('rk_theme') || 'dark';
+  if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+} catch (e) {}
+</script>
+<style>
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); overflow: hidden; font-size: 20px; }
+  .cd { display: flex; flex-direction: column; height: 100vh; }
+  .cd-head { display: flex; align-items: center; gap: 16px; padding: 14px 28px; background: var(--card); border-bottom: 1px solid var(--border); }
+  .cd-head img { height: 54px; background: #fff; border-radius: 12px; padding: 4px 8px; }
+  .cd-head .shop { font-size: 26px; font-weight: 800; letter-spacing: .02em; }
+  .cd-head .sub { color: var(--muted); font-size: 15px; }
+  .cd-head .counter { margin-left: auto; font-size: 16px; color: var(--muted); }
+  .cd-body { flex: 1; display: flex; min-height: 0; }
+  .cd-items { flex: 1; overflow-y: auto; padding: 10px 28px; }
+  .cd-items table { width: 100%; border-collapse: collapse; font-size: 22px; }
+  .cd-items th { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 10px 8px; border-bottom: 1px solid var(--border); text-align: left; background: none; position: sticky; top: 0; background: var(--bg); }
+  .cd-items td { padding: 12px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .cd-items td.num, .cd-items th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cd-items tr.new td { animation: cd-in .6s ease-out; }
+  @keyframes cd-in { from { background: var(--tint); } to { background: transparent; } }
+  .cd-items .meta { color: var(--muted); font-size: 15px; }
+  .cd-items .offer { color: var(--ok-fg); font-size: 15px; font-weight: 600; }
+  .cd-side { width: 380px; background: var(--card); border-left: 1px solid var(--border); padding: 24px 28px; display: flex; flex-direction: column; }
+  .cd-side .line { display: flex; justify-content: space-between; padding: 8px 0; font-size: 20px; }
+  .cd-side .line.muted { color: var(--muted); font-size: 17px; }
+  .cd-side .line.offer { color: var(--ok-fg); font-weight: 600; }
+  .cd-side .grand { margin-top: auto; border-top: 3px solid var(--text); padding-top: 16px; }
+  .cd-side .grand .label { font-size: 22px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .cd-side .grand .amount { font-size: 72px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .cd-side .grand .items { color: var(--muted); font-size: 16px; margin-top: 6px; }
+  .cd-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px; gap: 14px; }
+  .cd-center img { width: min(420px, 70vw); background: #fff; border-radius: 20px; padding: 18px 26px; box-shadow: 0 20px 60px var(--shadow); }
+  .cd-center h1 { font-size: 44px; margin: 10px 0 0; }
+  .cd-center p { color: var(--muted); font-size: 20px; margin: 0; }
+  .cd-center.paid h1 { color: var(--success); font-size: 52px; }
+  .cd-center .big { font-size: 84px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .cd-center .change { font-size: 30px; }
+  .cd-center .tick { font-size: 90px; color: var(--success); line-height: 1; }
+  .cd-foot { padding: 8px 28px; color: var(--muted); font-size: 14px; display: flex; justify-content: space-between; border-top: 1px solid var(--border); background: var(--card); }
+  .cd-foot .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--success); margin-right: 6px; }
+  .cd-foot .dot.off { background: var(--danger); }
+  .hidden { display: none !important; }
+  @media (max-width: 900px) { .cd-body { flex-direction: column; } .cd-side { width: auto; border-left: none; border-top: 1px solid var(--border); padding: 14px 20px; } .cd-side .grand { margin-top: 0; } .cd-side .grand .amount { font-size: 52px; } .cd-items { padding: 6px 16px; } .cd-items table { font-size: 18px; } }
+</style>
+</head>
+<body>
+<div class="cd">
+  <div class="cd-head">
+    <img src="{{ url_for('static', filename='logo-mark.svg') }}" alt="">
+    <div><div class="shop">{{ settings.shop_name }}</div><div class="sub">{{ settings.address or '' }}</div></div>
+    <div class="counter">{{ branch.name }} &middot; Counter {{ counter.code }}</div>
+  </div>
+
+  <div class="cd-body">
+    <div class="cd-center" id="idle">
+      <img src="{{ url_for('static', filename='logo.svg') }}" alt="{{ settings.shop_name }}">
+      <h1>Welcome</h1>
+      <p>Thank you for shopping with us</p>
+    </div>
+
+    <div class="cd-center paid hidden" id="paid">
+      <div class="tick">&#10003;</div>
+      <h1>Thank you!</h1>
+      <div class="big" id="paid-amount"></div>
+      <p id="paid-mode"></p>
+      <div class="change" id="paid-change"></div>
+      <p class="meta" id="paid-inv"></p>
+    </div>
+
+    <div class="cd-items hidden" id="items-wrap">
+      <table><thead><tr><th>#</th><th>Item</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Amount</th></tr></thead><tbody id="items"></tbody></table>
+    </div>
+    <div class="cd-side hidden" id="side">
+      <div class="line"><span>Subtotal</span><span id="subtotal"></span></div>
+      <div class="line offer" id="offerline"><span>Offer savings</span><span id="offer"></span></div>
+      <div class="line" id="discline"><span>Discount</span><span id="discount"></span></div>
+      <div class="line muted"><span>Incl. GST</span><span id="tax"></span></div>
+      <div class="line muted" id="custline"><span>Customer</span><span id="customer"></span></div>
+      <div class="grand"><div class="label">Total to pay</div><div class="amount" id="grand">&#8377;0</div><div class="items" id="count"></div></div>
+    </div>
+  </div>
+
+  <div class="cd-foot"><span><span class="dot" id="dot"></span><span id="status">Connected</span></span><span id="clock"></span></div>
+</div>
+
+<script>
+const CID = {{ counter.id }};
+const $ = id => document.getElementById(id);
+const inr = n => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = t => String(t || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let lastCount = 0, lastKey = '', paidTimer = null;
+
+function show(state) {
+  const key = JSON.stringify(state);
+  if (key === lastKey) return;
+  lastKey = key;
+  const st = state.status || 'idle';
+  $('idle').classList.toggle('hidden', st !== 'idle');
+  $('paid').classList.toggle('hidden', st !== 'paid');
+  $('items-wrap').classList.toggle('hidden', st !== 'billing');
+  $('side').classList.toggle('hidden', st !== 'billing');
+  if (st === 'billing') {
+    const items = state.items || [];
+    $('items').innerHTML = items.map((r, i) => `<tr class="${i >= lastCount ? 'new' : ''}">
+      <td class="meta">${i + 1}</td>
+      <td>${esc(r.name)}${r.offer ? `<div class="offer">${esc(r.offer)} &minus; ${inr(r.offer_discount)}</div>` : ''}</td>
+      <td class="num">${r.qty} <span class="meta">${esc(r.unit)}</span></td>
+      <td class="num">${inr(r.price)}</td>
+      <td class="num">${inr(r.amount)}</td></tr>`).join('');
+    lastCount = items.length;
+    const wrap = $('items-wrap'); wrap.scrollTop = wrap.scrollHeight;
+    $('subtotal').textContent = inr(state.subtotal);
+    $('offerline').classList.toggle('hidden', !state.offer_discount);
+    $('offer').textContent = '− ' + inr(state.offer_discount);
+    $('discline').classList.toggle('hidden', !state.discount);
+    $('discount').textContent = '− ' + inr(state.discount);
+    $('tax').textContent = inr(state.tax);
+    $('custline').classList.toggle('hidden', !state.customer);
+    $('customer').textContent = state.customer || '';
+    $('grand').textContent = '₹' + Math.round(state.grand || 0).toLocaleString('en-IN');
+    $('count').textContent = items.length + ' item' + (items.length === 1 ? '' : 's');
+  } else {
+    lastCount = 0;
+  }
+  if (st === 'paid') {
+    $('paid-amount').textContent = '₹' + Math.round(state.grand || 0).toLocaleString('en-IN');
+    $('paid-mode').textContent = state.mode === 'Credit' ? ('Paid now ' + inr(state.paid) + ' · ' + inr(state.remaining) + ' added to your account') : ('Paid by ' + (state.mode || ''));
+    $('paid-change').textContent = state.change > 0 ? ('Change to return: ' + inr(state.change)) : '';
+    $('paid-inv').textContent = state.invoice_no ? 'Bill no. ' + state.invoice_no : '';
+  }
+}
+
+// instant updates from the billing screen in the same browser
+try {
+  const bc = new BroadcastChannel('rk-display');
+  bc.onmessage = e => { if (e.data && e.data.counter_id === CID) { show(e.data); fresh = Date.now(); } };
+} catch (e) {}
+
+// polling for a display on another device (tablet facing the customer)
+let fresh = 0;
+async function poll() {
+  try {
+    const r = await fetch('/api/display/' + CID, { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    const s = await r.json();
+    if (Date.now() - fresh > 1500) show(s);
+    $('dot').classList.remove('off'); $('status').textContent = 'Connected';
+  } catch (e) { $('dot').classList.add('off'); $('status').textContent = 'Reconnecting...'; }
+}
+poll(); setInterval(poll, 1500);
+
+function tick() {
+  const n = new Date(), p = x => String(x).padStart(2, '0');
+  let h = n.getHours(), ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12;
+  $('clock').textContent = n.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' }) + '  ' + p(h) + ':' + p(n.getMinutes()) + ' ' + ap;
+}
+tick(); setInterval(tick, 10000);
+document.addEventListener('dblclick', () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {}); });
+</script>
+</body>
+</html>

@@ -59,6 +59,16 @@ Every user has a **Help** item in the left menu. It shows a step-by-step guide f
 - **Offers** (managers and admin, under Inventory): create a percentage off a product, a special price, buy X get Y free, a percentage off a whole category, or a bill-level offer such as 5% or a flat amount off bills above a threshold. Set the dates, switch it on or off, and for admin choose all branches or one. Live offers apply automatically on the billing screen: items with an offer are tagged OFFER in the search list, the savings show in the totals, and the invoice prints the offer name on each item and "You saved" at the bottom. When several offers match, the customer gets the best one. Managers create offers for their own branch only.
 - **Reports**: daily sales, GST summary (for your GST return), item-wise profit, counter-wise sales, purchases, branch comparison. Every report exports to Excel, CSV, and PDF. Each file starts with the company details and the branch details, the report title, the period, and who generated it and when.
 
+## Customer display
+
+A second screen facing the customer shows the bill live: items with quantity and price, offer savings, the total in large figures, and after saving a "Thank you" screen with the amount paid and the change to return (ten seconds, then back to the welcome screen).
+
+- On the billing screen click **Customer display**; it opens `/display/<counter id>` in a new window for the current counter.
+- **Second monitor on the cashier PC**: set Windows to extend the desktop, drag the window to the customer's monitor and double-click it for full screen.
+- **Tablet or any screen on the shop Wi-Fi**: open `http://<main PC address>:5000/display/<counter id>` on it. The page needs no login and shows only the current bill of that counter. It is dark by default; add `?theme=light` for a light screen.
+- Each counter runs in its own browser, normally its own PC: a browser holds one login and one counter, so two billing tabs in the same browser are the same counter. To try two counters on one PC use two different browsers or an InPrivate window.
+- The display gets instant updates when it runs in the same browser as the billing tab, and polls the server every 1.5 seconds otherwise. The state is kept in memory, so after a server restart the display shows the welcome screen until the next item is added.
+
 ## Barcode scanner
 
 Any USB or Bluetooth barcode scanner that types like a keyboard works. No driver or setting in the system is needed.

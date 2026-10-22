@@ -157,7 +157,32 @@ function calc() {
   $('remaining').textContent = '₹' + Math.max(0, grand - paid).toFixed(2);
   const recv = +$('received').value || 0;
   $('change').textContent = '₹' + (recv ? Math.max(0, recv - grand).toFixed(2) : '0');
+  lastCalc = { subtotal, offerTotal, discount, tax, grand };
+  pushDisplay();
 }
+
+// ---------- customer display (second screen / tablet) ----------
+let lastCalc = { subtotal: 0, offerTotal: 0, discount: 0, tax: 0, grand: 0 };
+let bcDisplay = null; try { bcDisplay = new BroadcastChannel('rk-display'); } catch (e) {}
+let displayTimer = null, holdPaidUntil = 0;
+function pushDisplay(extra) {
+  if (typeof CURRENT_COUNTER === 'undefined' || !CURRENT_COUNTER) return;
+  let state;
+  if (extra) state = { counter_id: CURRENT_COUNTER, ...extra };
+  else if (!cart.length) { if (Date.now() < holdPaidUntil) return; state = { counter_id: CURRENT_COUNTER, status: 'idle' }; }
+  else {
+    const lo = cart.map(r => lineOffer(r));
+    state = { counter_id: CURRENT_COUNTER, status: 'billing',
+      items: cart.map((r, i) => ({ name: r.name, qty: r.quantity, unit: r.unit, price: r.unit_price,
+        amount: Math.round((r.quantity * r.unit_price - lo[i].disc) * 100) / 100, offer: lo[i].disc ? lo[i].name : '', offer_discount: lo[i].disc })),
+      subtotal: lastCalc.subtotal, offer_discount: lastCalc.offerTotal, discount: lastCalc.discount, tax: lastCalc.tax, grand: lastCalc.grand,
+      customer: customer ? customer.name : '' };
+  }
+  if (bcDisplay) bcDisplay.postMessage(state);            // instant, same browser
+  clearTimeout(displayTimer);                              // server copy for a display on another device
+  displayTimer = setTimeout(() => fetch('/api/display', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state) }).catch(() => {}), extra ? 0 : 250);
+}
+new MutationObserver(() => pushDisplay()).observe($('custinfo'), { childList: true, characterData: true, subtree: true });
 $('discount').addEventListener('input', calc);
 $('paid').addEventListener('input', calc);
 $('received').addEventListener('input', calc);
@@ -202,7 +227,14 @@ async function save() {
   $('save').disabled = true;
   try {
     const r = await (await fetch('/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
-    if (r.ok) { window.open('/sales/' + r.id + '?print=1', '_blank'); clearBill(); }
+    if (r.ok) {
+      const grand = r.grand_total, recv = +$('received').value || 0, paidNow = +$('paid').value || 0;
+      holdPaidUntil = Date.now() + 10000;              // keep the thank-you screen for 10 s unless a new bill starts
+      pushDisplay({ status: 'paid', invoice_no: r.invoice_no, grand, mode, change: recv ? Math.max(0, recv - grand) : 0,
+                    paid: mode === 'Credit' ? paidNow : grand, remaining: mode === 'Credit' ? Math.max(0, grand - paidNow) : 0 });
+      setTimeout(() => { if (!cart.length) pushDisplay(); }, 10000);
+      window.open('/sales/' + r.id + '?print=1', '_blank'); clearBill();
+    }
     else alert(r.error || 'Could not save bill');
   } finally { $('save').disabled = false; }
 }

@@ -1076,6 +1076,45 @@ def offer_delete(oid):
     return redirect(url_for("offers"))
 
 
+# --------------------------------------------------------------------------
+# Customer display: a second screen or tablet that shows the running bill
+# --------------------------------------------------------------------------
+DISPLAY_STATE = {}          # counter_id -> last state posted by the billing screen (in memory, resets on restart)
+
+
+@app.route("/display/<int:cid>")
+def customer_display(cid):
+    """Public page (no login): shows only the current bill of one counter, nothing else."""
+    counter = q("SELECT * FROM counters WHERE id=?", (cid,), one=True) or abort(404)
+    branch = q("SELECT * FROM branches WHERE id=?", (counter["branch_id"],), one=True)
+    return render_template("display.html", counter=counter, branch=branch)
+
+
+@app.route("/api/display/<int:cid>")
+def api_display_get(cid):
+    return jsonify(DISPLAY_STATE.get(cid) or {"status": "idle", "counter_id": cid})
+
+
+@app.route("/api/display", methods=["POST"])
+@login_required
+def api_display_set():
+    # The billing page says which counter it belongs to. Do not use the session's counter: all tabs of one
+    # browser share one session, so two billing tabs for two counters would both be filed under one counter.
+    body = request.get_json(silent=True) or {}
+    cid = body.get("counter_id") or session.get("counter_id")
+    counter = q("SELECT * FROM counters WHERE id=? AND active=1", (cid,), one=True) if cid else None
+    if not counter:
+        return jsonify(ok=False, error="No counter selected."), 400
+    u = current_user()
+    if u["role"] != "admin" and counter["branch_id"] != branch_id():
+        return jsonify(ok=False, error="That counter belongs to another branch."), 403
+    cid = counter["id"]
+    body["counter_id"] = cid
+    body["updated"] = datetime.now().isoformat(timespec="seconds")
+    DISPLAY_STATE[cid] = body
+    return jsonify(ok=True)
+
+
 @app.route("/api/offers")
 @login_required
 def api_offers():
@@ -2599,7 +2638,7 @@ ACTION_LABELS = {
     "customers_export": "Exported customer list",
 }
 SKIP_ENDPOINTS = {"static", "api_product_search", "api_customer_search", "api_notices_unread", "api_branch_stock", "notice_mark_read", "signature_preview",
-                  "login_bg_image"}
+                  "login_bg_image", "customer_display", "api_display_get", "api_display_set"}
 LOGGED_GETS = {"logout", "switch_branch", "report_export", "audit_export", "activity_export", "sales_export", "receipts_export",
                "stock_export", "customers_export", "document_view", "purchase_bill", "document_signed"}
 SECRET_KEYS = ("password", "old", "new", "confirm")
